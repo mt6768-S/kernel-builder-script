@@ -50,11 +50,21 @@ class TelegramUploader:
             log_warn(f"Telegram sendMessage request exception: {e}")
             return False
 
-    def upload_document(self, file_path: pathlib.Path, caption: str = "") -> bool:
-        return self.upload_documents([file_path], caption=caption)
+    def upload_document(
+        self,
+        file_path: pathlib.Path,
+        caption: str = "",
+        gofile_url: str | None = None,
+    ) -> bool:
+        return self.upload_documents(
+            [file_path], caption=caption, gofile_url=gofile_url
+        )
 
     def upload_documents(
-        self, file_paths: Sequence[pathlib.Path], caption: str = ""
+        self,
+        file_paths: Sequence[pathlib.Path],
+        caption: str = "",
+        gofile_url: str | None = None,
     ) -> bool:
         if not self.is_configured:
             log_warn("Telegram bot token or chat ID missing; skipping document upload.")
@@ -67,7 +77,7 @@ class TelegramUploader:
 
         # If single file, direct upload
         if len(valid_files) == 1:
-            return self._upload_single_file(valid_files[0], caption)
+            return self._upload_single_file(valid_files[0], caption, gofile_url)
 
         # Multi-file check size
         total_size = sum(p.stat().st_size for p in valid_files)
@@ -79,13 +89,56 @@ class TelegramUploader:
         success = True
         for i, f in enumerate(valid_files):
             cap = caption if i == 0 else ""
-            if not self._upload_single_file(f, cap):
+            if not self._upload_single_file(f, cap, gofile_url):
                 success = False
         return success
 
-    def _upload_single_file(self, file_path: pathlib.Path, caption: str = "") -> bool:
-        url = f"{self.base_url}/sendDocument"
+    def _fallback_gofile_upload(
+        self,
+        file_path: pathlib.Path,
+        caption: str = "",
+        gofile_url: str | None = None,
+    ) -> bool:
+        from kbuild.upload.gofile import GoFileUploader
+
         size_mb = file_path.stat().st_size / (1024 * 1024)
+        download_url = gofile_url or GoFileUploader.upload_file(file_path)
+        if not download_url:
+            log_error(
+                f"GoFile fallback upload failed for {file_path.name} ({size_mb:.2f} MB)."
+            )
+            return False
+
+        link_note = (
+            f'\n\n<b>📦 Download (GoFile)</b>: <a href="{download_url}">{download_url}</a>\n'
+            f"<i>(File size {size_mb:.1f} MB exceeds Telegram limit)</i>"
+        )
+        msg = (
+            f"{caption}{link_note}"
+            if caption
+            else f"<b>{file_path.name}</b> ({size_mb:.1f} MB)\n{link_note.strip()}"
+        )
+        return self.send_message(msg)
+
+    def _upload_single_file(
+        self,
+        file_path: pathlib.Path,
+        caption: str = "",
+        gofile_url: str | None = None,
+    ) -> bool:
+        size_bytes = file_path.stat().st_size
+        size_mb = size_bytes / (1024 * 1024)
+
+        if size_bytes > MAX_MEDIA_GROUP_BYTES:
+            log_warn(
+                f"{file_path.name} ({size_mb:.2f} MB) exceeds Telegram 48 MB limit. "
+                "Falling back to GoFile upload..."
+            )
+            return self._fallback_gofile_upload(
+                file_path, caption, gofile_url=gofile_url
+            )
+
+        url = f"{self.base_url}/sendDocument"
         log_info(f"Uploading {file_path.name} ({size_mb:.2f} MB) to Telegram...")
 
         data = {
@@ -102,6 +155,18 @@ class TelegramUploader:
             if resp.status_code == 200 and resp.json().get("ok"):
                 log_success(f"Uploaded {file_path.name} to Telegram successfully.")
                 return True
+
+            if resp.status_code == 400 and any(
+                phrase in resp.text.lower() for phrase in ("too big", "too large")
+            ):
+                log_warn(
+                    f"Telegram rejected {file_path.name} due to file size limit. "
+                    "Falling back to GoFile..."
+                )
+                return self._fallback_gofile_upload(
+                    file_path, caption, gofile_url=gofile_url
+                )
+
             log_error(
                 f"Telegram upload failed for {file_path.name}: {resp.status_code} {resp.text}"
             )

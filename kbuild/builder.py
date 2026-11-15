@@ -303,6 +303,10 @@ class KernelBuilder:
             commit_hint = self._get_commit_hint()
 
             # Uploads
+            gofile_url: str | None = None
+            if self.gofile_enabled:
+                gofile_url = self.gofile.upload_file(zip_path)
+
             if self.telegram_enabled and self.telegram.is_configured:
                 success_caption = (
                     f"### Build Success (<i>{self.build_hash}</i>)\n"
@@ -314,10 +318,9 @@ class KernelBuilder:
                     f"<b>SHA256</b>: <b><code>{sha256_hex}</code></b>\n"
                     f"<pre>\n{commit_hint}\n</pre>"
                 )
-                self.telegram.upload_document(zip_path, caption=success_caption)
-
-            if self.gofile_enabled:
-                self.gofile.upload_file(zip_path)
+                self.telegram.upload_document(
+                    zip_path, caption=success_caption, gofile_url=gofile_url
+                )
 
             log_step(
                 "COMPLETE", f"Kernel build and packaging completed in {build_time_str}!"
