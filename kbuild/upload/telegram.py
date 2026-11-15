@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import pathlib
 from collections.abc import Coroutine, Sequence
 from typing import Any
@@ -26,9 +27,33 @@ _CONNECT_TIMEOUT = 30
 
 
 class TelegramUploader:
-    def __init__(self, bot_token: str | None, chat_id: str | None):
-        self.bot_token = (bot_token or "").strip()
-        self.chat_id = (chat_id or "").strip()
+    def __init__(self, bot_token: str | None = None, chat_id: str | None = None):
+        env_token = (
+            os.environ.get("TELEGRAM_BOT_TOKEN")
+            or os.environ.get("TG_BOT_TOKEN")
+            or os.environ.get("BOT_TOKEN")
+            or os.environ.get("TG_TOKEN")
+        )
+        env_chat = (
+            os.environ.get("TELEGRAM_CHAT_ID")
+            or os.environ.get("TG_CHAT_ID")
+            or os.environ.get("CHAT_ID")
+            or os.environ.get("TG_CHAT")
+        )
+
+        resolved_token = (
+            env_token.strip()
+            if env_token and env_token.strip()
+            else (bot_token or "").strip()
+        )
+        resolved_chat = (
+            env_chat.strip()
+            if env_chat and env_chat.strip()
+            else (chat_id or "").strip()
+        )
+
+        self.bot_token = resolved_token
+        self.chat_id = resolved_chat
 
     @property
     def is_configured(self) -> bool:

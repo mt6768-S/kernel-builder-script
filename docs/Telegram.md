@@ -30,8 +30,11 @@ All transport, multipart encoding, and media-group formatting are handled by
 ## Workflow
 
 ### 1. Initialization (`__init__`)
-Cleans and stores `bot_token` and `chat_id`. If either credential is missing,
-every action exits early and returns `False`.
+Cleans and stores `bot_token` and `chat_id`. Either credential can be set or
+overridden via environment variables (`TELEGRAM_CHAT_ID`, `TG_CHAT_ID`,
+`CHAT_ID`, or `TG_CHAT` for the chat; `TELEGRAM_BOT_TOKEN`, `TG_BOT_TOKEN`,
+`BOT_TOKEN`, or `TG_TOKEN` for the bot token). If either credential is
+missing, every action exits early and returns `False`.
 
 ### 2. Sending Text Messages (`send_message`)
 Runs an async `Bot` context manager and calls `bot.send_message` with

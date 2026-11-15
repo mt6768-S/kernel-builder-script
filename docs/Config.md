@@ -27,6 +27,6 @@ declares the schema and the CLI helpers. A project-local `.kb.json`, `kb.json`,
 | `default_defconfig` | string | `vendor/mt6768_defconfig` | Default defconfig when none supplied |
 | `host` | string \| null | `null` | Hostname shown in build info |
 | `user` | string \| null | `null` | Username shown in build info |
-| `bot_token` | string \| null | `null` | Telegram Bot Token |
-| `chat_id` | string \| null | `null` | Telegram Chat ID |
+| `bot_token` | string \| null | `null` | Telegram Bot Token (can be overridden via `TELEGRAM_BOT_TOKEN`, `BOT_TOKEN`, etc.) |
+| `chat_id` | string \| null | `null` | Telegram Chat ID (can be overridden via `TELEGRAM_CHAT_ID`, `CHAT_ID`, etc.) |
 | `ak3_repo` | string | `https://github.com/mt6768-S/AnyKernel3` | AnyKernel3 repository URL |

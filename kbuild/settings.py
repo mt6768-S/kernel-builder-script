@@ -90,6 +90,24 @@ def load_config(cwd=None) -> KbuildConfig:
         except Exception as e:
             logger.warning("{}", f"Failed to read {source}: {e}")
 
+    env_chat = (
+        os.environ.get("TELEGRAM_CHAT_ID")
+        or os.environ.get("TG_CHAT_ID")
+        or os.environ.get("CHAT_ID")
+        or os.environ.get("TG_CHAT")
+    )
+    if env_chat and env_chat.strip():
+        cfg.chat_id = env_chat.strip()
+
+    env_token = (
+        os.environ.get("TELEGRAM_BOT_TOKEN")
+        or os.environ.get("TG_BOT_TOKEN")
+        or os.environ.get("BOT_TOKEN")
+        or os.environ.get("TG_TOKEN")
+    )
+    if env_token and env_token.strip():
+        cfg.bot_token = env_token.strip()
+
     return cfg
 
 

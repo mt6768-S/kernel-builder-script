@@ -157,3 +157,16 @@ def test_telegram_file_too_big_400_fallback(tmp_path):
     assert (
         "https://gofile.io/d/fallback400" in bot.send_message.await_args.kwargs["text"]
     )
+
+
+def test_telegram_chat_id_from_env(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "-100999888")
+    tg = TelegramUploader("123:ABC", "-100123")
+    assert tg.chat_id == "-100999888"
+
+
+def test_telegram_chat_id_from_short_env(monkeypatch):
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setenv("CHAT_ID", "-100777666")
+    tg = TelegramUploader("123:ABC", "")
+    assert tg.chat_id == "-100777666"

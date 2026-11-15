@@ -73,3 +73,10 @@ def test_update_config_from_pairs(tmp_path, monkeypatch):
     assert reset_cfg.ksu is False
     assert reset_cfg.ksu_target == "master"
     assert reset_cfg.jobs is None
+
+
+def test_load_config_chat_id_from_env(tmp_path, monkeypatch):
+    _patch_config_file(tmp_path, monkeypatch)
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "-100555444")
+    loaded = load_config()
+    assert loaded.chat_id == "-100555444"
