@@ -403,7 +403,26 @@ class KernelBuilder:
         if self.nomount_enabled:
             self.nomount_mgr.inject()
 
-        # 4. Compilation step
+        # 4. Refresh config with olddefconfig if integrations modified .config
+        if self.ksu_enabled or self.nomount_enabled:
+            log_info("Refreshing kernel configuration with olddefconfig...")
+            olddef_cmd = [
+                "make",
+                f"O={out_dir}",
+                "ARCH=arm64",
+                f"CC={self.cc}",
+                "olddefconfig",
+            ]
+            res = subprocess.run(
+                olddef_cmd, cwd=self.source_dir, env=env, capture_output=True, text=True
+            )
+            if res.returncode != 0:
+                raise BuildError(
+                    f"olddefconfig failed: {res.stderr.strip() or res.stdout.strip()}"
+                )
+            log_success("Kernel configuration updated with olddefconfig.")
+
+        # 5. Compilation step
         log_info(f"Starting kernel compilation: {' '.join(base_make_args)}")
         with open(log_file, "w", encoding="utf-8") as lf:
             proc = subprocess.Popen(
