@@ -259,7 +259,7 @@ class KernelBuilder:
         # Telegram start message (following docs/ExampleTexts.md)
         if self.telegram_enabled and self.telegram.is_configured:
             start_msg = (
-                f"### Building Kernel (<i>{self.build_hash}</i>)\n"
+                f"Building Kernel (<i>{self.build_hash}</i>)\n"
                 f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
                 f"<b>Linux Version</b>: <b><code>{linux_version}</code></b>\n"
                 f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
@@ -315,7 +315,7 @@ class KernelBuilder:
 
             if self.telegram_enabled and self.telegram.is_configured:
                 success_caption = (
-                    f"### Build Success (<i>{self.build_hash}</i>)\n"
+                    f"Build Success (<i>{self.build_hash}</i>)\n"
                     f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
                     f"<b>Linux Version</b>: <b><code>{linux_version}</code></b>\n"
                     f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
@@ -337,7 +337,6 @@ class KernelBuilder:
             return 0
 
         except Exception as e:
-            # Handle failure: extract targeted error context and notify Telegram
             log_tail = ""
             if log_file.is_file():
                 try:
@@ -348,12 +347,12 @@ class KernelBuilder:
             if self.telegram_enabled and self.telegram.is_configured:
                 escaped_tail = html.escape(log_tail or str(e))
                 fail_msg = (
-                    f"### Build Failed (<i>{self.build_hash}</i>)\n"
+                    f"Build Failed (<i>{self.build_hash}</i>)\n"
                     f"<pre>\n{escaped_tail}\n</pre>"
                 )
+                self.telegram.send_message(fail_msg)
                 if log_file.is_file():
                     self.telegram.upload_document(log_file)
-                self.telegram.send_message(fail_msg)
 
             raise
         finally:

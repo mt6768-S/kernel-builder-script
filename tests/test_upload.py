@@ -1,20 +1,40 @@
 import pathlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from telegram.error import BadRequest, TelegramError
 
 from kbuild.upload.telegram import TelegramUploader
 
 
-@patch("requests.post")
-def test_telegram_send_message(mock_post):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"ok": True}
-    mock_post.return_value = mock_resp
+class FakeBot:
+    def __init__(self, token):
+        self.token = token
+        self.send_message = AsyncMock()
+        self.send_document = AsyncMock()
+        self.send_media_group = AsyncMock()
 
-    tg = TelegramUploader("123:ABC", "-100123")
-    assert tg.is_configured is True
-    assert tg.send_message("<b>Test message</b>") is True
-    mock_post.assert_called_once()
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return False
+
+
+def _bot_mock():
+    return FakeBot("test-token")
+
+
+def test_telegram_send_message():
+    bot = _bot_mock()
+
+    with patch("kbuild.upload.telegram.Bot", return_value=bot):
+        tg = TelegramUploader("123:ABC", "-100123")
+        assert tg.is_configured is True
+        assert tg.send_message("<b>Test message</b>") is True
+
+    bot.send_message.assert_awaited_once()
+    assert bot.send_message.await_args.kwargs["chat_id"] == "-100123"
+    assert bot.send_message.await_args.kwargs["text"] == "<b>Test message</b>"
 
 
 def test_telegram_unconfigured():
@@ -23,65 +43,117 @@ def test_telegram_unconfigured():
     assert tg.send_message("Test") is False
 
 
-@patch("requests.post")
-def test_telegram_upload_document(mock_post, tmp_path):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"ok": True}
-    mock_post.return_value = mock_resp
+def test_telegram_upload_document(tmp_path):
+    bot = _bot_mock()
 
     test_file = tmp_path / "test.zip"
     test_file.write_text("DATA", encoding="utf-8")
 
-    tg = TelegramUploader("123:ABC", "-100123")
-    assert tg.upload_document(test_file, caption="Test caption") is True
+    with patch("kbuild.upload.telegram.Bot", return_value=bot):
+        tg = TelegramUploader("123:ABC", "-100123")
+        assert tg.upload_document(test_file, caption="Test caption") is True
+
+    bot.send_document.assert_awaited_once()
+    kwargs = bot.send_document.await_args.kwargs
+    assert kwargs["filename"] == "test.zip"
+    assert kwargs["caption"] == "Test caption"
+
+
+def test_telegram_media_group_upload(tmp_path):
+    bot = _bot_mock()
+
+    first = tmp_path / "first.zip"
+    second = tmp_path / "second.zip"
+    first.write_text("A", encoding="utf-8")
+    second.write_text("B", encoding="utf-8")
+
+    with patch("kbuild.upload.telegram.Bot", return_value=bot):
+        tg = TelegramUploader("123:ABC", "-100123")
+        assert tg.upload_documents([first, second], caption="Artifacts") is True
+
+    bot.send_media_group.assert_awaited_once()
+    bot.send_document.assert_not_awaited()
+
+
+def test_telegram_media_group_failure_falls_back(tmp_path):
+    bot = _bot_mock()
+    bot.send_media_group.side_effect = TelegramError("boom")
+
+    first = tmp_path / "first.zip"
+    second = tmp_path / "second.zip"
+    first.write_text("A", encoding="utf-8")
+    second.write_text("B", encoding="utf-8")
+
+    with patch("kbuild.upload.telegram.Bot", return_value=bot):
+        tg = TelegramUploader("123:ABC", "-100123")
+        assert tg.upload_documents([first, second], caption="Artifacts") is True
+
+    bot.send_media_group.assert_awaited_once()
+    assert bot.send_document.await_count == 2
 
 
 @patch("kbuild.upload.gofile.GoFileUploader.upload_file")
-@patch("requests.post")
-def test_telegram_large_file_fallback_gofile(mock_post, mock_gofile, tmp_path):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"ok": True}
-    mock_post.return_value = mock_resp
+def test_telegram_large_file_fallback_gofile(mock_gofile, tmp_path):
+    bot = _bot_mock()
     mock_gofile.return_value = "https://gofile.io/d/abc123"
 
     large_file = tmp_path / "large_kernel.zip"
     large_file.write_text("LARGE", encoding="utf-8")
 
-    # Patch stat size to 50 MB
     with patch.object(
         pathlib.Path, "stat", return_value=MagicMock(st_size=50 * 1024 * 1024)
     ):
-        tg = TelegramUploader("123:ABC", "-100123")
-        assert tg.upload_document(large_file, caption="Build Success") is True
+        with patch("kbuild.upload.telegram.Bot", return_value=bot):
+            tg = TelegramUploader("123:ABC", "-100123")
+            assert tg.upload_document(large_file, caption="Build Success") is True
 
     mock_gofile.assert_called_once_with(large_file)
-    mock_post.assert_called_once()
-    payload = mock_post.call_args[1]["data"]
-    assert "https://gofile.io/d/abc123" in payload["text"]
-    assert "exceeds Telegram limit" in payload["text"]
+    bot.send_document.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+    text = bot.send_message.await_args.kwargs["text"]
+    assert "Build Success" in text
+    assert "https://gofile.io/d/abc123" in text
 
 
-@patch("kbuild.upload.gofile.GoFileUploader.upload_file")
-@patch("requests.post")
-def test_telegram_file_too_big_400_fallback(mock_post, mock_gofile, tmp_path):
-    # First call (sendDocument) returns 400 "file is too big", second call (sendMessage) returns 200
-    resp_doc = MagicMock()
-    resp_doc.status_code = 400
-    resp_doc.text = "Bad Request: file is too big"
-
-    resp_msg = MagicMock()
-    resp_msg.status_code = 200
-    resp_msg.json.return_value = {"ok": True}
-
-    mock_post.side_effect = [resp_doc, resp_msg]
-    mock_gofile.return_value = "https://gofile.io/d/fallback400"
+def test_gofile_link_included_in_document_caption(tmp_path):
+    bot = _bot_mock()
 
     test_file = tmp_path / "test.zip"
     test_file.write_text("DATA", encoding="utf-8")
 
-    tg = TelegramUploader("123:ABC", "-100123")
-    assert tg.upload_document(test_file, caption="Build Success") is True
-    mock_gofile.assert_called_once_with(test_file)
-    assert mock_post.call_count == 2
+    with patch("kbuild.upload.telegram.Bot", return_value=bot):
+        tg = TelegramUploader("123:ABC", "-100123")
+        assert (
+            tg.upload_document(
+                test_file,
+                caption="Build Success",
+                gofile_url="https://gofile.io/d/inline",
+            )
+            is True
+        )
+
+    caption = bot.send_document.await_args.kwargs["caption"]
+    assert "Build Success" in caption
+    assert "https://gofile.io/d/inline" in caption
+
+
+def test_telegram_file_too_big_400_fallback(tmp_path):
+    bot = _bot_mock()
+    bot.send_document.side_effect = BadRequest("Bad Request: file is too big")
+
+    test_file = tmp_path / "test.zip"
+    test_file.write_text("DATA", encoding="utf-8")
+
+    with patch(
+        "kbuild.upload.gofile.GoFileUploader.upload_file",
+        return_value="https://gofile.io/d/fallback400",
+    ):
+        with patch("kbuild.upload.telegram.Bot", return_value=bot):
+            tg = TelegramUploader("123:ABC", "-100123")
+            assert tg.upload_document(test_file, caption="Build Success") is True
+
+    assert bot.send_document.await_count == 1
+    bot.send_message.assert_awaited_once()
+    assert (
+        "https://gofile.io/d/fallback400" in bot.send_message.await_args.kwargs["text"]
+    )

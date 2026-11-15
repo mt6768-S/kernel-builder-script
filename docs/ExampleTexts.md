@@ -3,7 +3,7 @@
 
 ### When Starting Build
 
-### Building Kernel (*Hash for this build*)
+Building Kernel (*Hash for this build*)
 **Device**: **`device`**
 **Linux Version**: **`version`**
 **KernelSU**: **`kernelsu install script owner eg. backslashxx, shockwave, emredemr, kernelsu`**
@@ -14,16 +14,16 @@
 
 ### When Build Failed
 
-### Build Failed (*Hash of this build*)
-<build-logs.log>
+Build Failed (*Hash of this build*)
+```
+<extracted compiler/linker errors with context>
+```
 
-```
-<small help for that (via helper script)>
-```
+The full build log is attached as a file (`kbuild_<hash>.log`) as well.
 
 ### When Build Success
 
-### Build Success (*Hash of this build*)
+Build Success (*Hash of this build*)
 <anykernel3.zip>
 
 **Device**: **`device`**
@@ -37,3 +37,7 @@
 ```
 
 Note: Hash is gonna be random
+
+When GoFile is enabled, the GoFile download link is appended to the Build
+Success message (both when the artifact is uploaded to Telegram and when it is
+too large and only the link can be sent).
