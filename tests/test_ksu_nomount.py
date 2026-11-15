@@ -46,6 +46,21 @@ def test_ksu_apply_config(tmp_path):
     assert "CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y" in content
 
 
+def test_nomount_apply_config(tmp_path):
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    config_file = out_dir / ".config"
+    config_file.write_text(
+        "CONFIG_FOO=y\n# CONFIG_NOMOUNT is not set\n", encoding="utf-8"
+    )
+
+    mgr = NoMountManager(tmp_path, "https://example.com/nomount_setup.sh", "dev")
+    mgr._apply_nomount_config(config_file)
+
+    content = config_file.read_text(encoding="utf-8")
+    assert "CONFIG_NOMOUNT=y" in content
+
+
 @patch("requests.get")
 @patch("subprocess.run")
 def test_ksu_inject_failure(mock_subproc, mock_get, tmp_path):
