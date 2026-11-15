@@ -144,6 +144,8 @@ class KernelBuilder:
         self.defconfigs = self._resolve_defconfig_list()
         self.device = extract_device_name(self.defconfigs)
         self.build_hash = uuid.uuid4().hex[:8]
+        self.compiler_ver = "clang"
+        self.linux_version = self._get_linux_version()
 
         self.ksu_mgr = KernelSUManager(
             self.source_dir, self.config.ksu_setup, self.ksu_target
@@ -183,34 +185,136 @@ class KernelBuilder:
         default_cfg = self.config.default_defconfig or "vendor/mt6768_defconfig"
         return resolve_defconfigs(self.source_dir, [default_cfg])
 
-    def _get_linux_version(self) -> str:
-        # Check compiled release file first
+    def _get_linux_version(
+        self,
+        out_dir: pathlib.Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> str:
+        # 1. Try running `make -s kernelrelease` if out_dir and env are provided
+        if out_dir and env and (out_dir / ".config").is_file():
+            try:
+                res = subprocess.run(
+                    ["make", "-s", f"O={out_dir}", "ARCH=arm64", "kernelrelease"],
+                    cwd=self.source_dir,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if res.returncode == 0:
+                    val = res.stdout.strip().splitlines()
+                    if val and val[-1].strip():
+                        return val[-1].strip()
+            except Exception:
+                pass
+
+        # 2. Check compiled release file candidates
         rel_candidates = [
+            (out_dir / "include" / "config" / "kernel.release") if out_dir else None,
             self.source_dir / "out" / "include" / "config" / "kernel.release",
             self.source_dir / "include" / "config" / "kernel.release",
         ]
         for c in rel_candidates:
-            if c.is_file():
+            if c and c.is_file():
                 try:
-                    return c.read_text(encoding="utf-8").strip()
+                    val = c.read_text(encoding="utf-8").strip()
+                    if val:
+                        return val
                 except Exception:
                     pass
 
-        # Fallback to parsing top-level Makefile
+        # 3. Check utsrelease.h
+        uts_candidates = [
+            (out_dir / "include" / "generated" / "utsrelease.h") if out_dir else None,
+            self.source_dir / "out" / "include" / "generated" / "utsrelease.h",
+            self.source_dir / "include" / "generated" / "utsrelease.h",
+        ]
+        for u in uts_candidates:
+            if u and u.is_file():
+                try:
+                    text = u.read_text(encoding="utf-8", errors="replace")
+                    match = re.search(r'#define\s+UTS_RELEASE\s+"([^"]+)"', text)
+                    if match:
+                        return match.group(1).strip()
+                except Exception:
+                    pass
+
+        # 4. Check CONFIG_LOCALVERSION in .config
+        local_ver = ""
+        cfg_candidates = [
+            (out_dir / ".config") if out_dir else None,
+            self.source_dir / "out" / ".config",
+            self.source_dir / ".config",
+        ]
+        for cf in cfg_candidates:
+            if cf and cf.is_file():
+                try:
+                    for line in cf.read_text(
+                        encoding="utf-8", errors="replace"
+                    ).splitlines():
+                        if line.startswith("CONFIG_LOCALVERSION="):
+                            local_ver = line.split("=", 1)[1].strip().strip('"')
+                            break
+                except Exception:
+                    pass
+                if local_ver:
+                    break
+
+        if not local_ver:
+            for lv_file in sorted(self.source_dir.glob("localversion*")):
+                try:
+                    local_ver += lv_file.read_text(encoding="utf-8").strip()
+                except Exception:
+                    pass
+
+        # 5. Parse top-level Makefile for VERSION, PATCHLEVEL, SUBLEVEL, EXTRAVERSION
+        v, p, s, extra = "", "", "", ""
         mf = self.source_dir / "Makefile"
         if mf.is_file():
             try:
-                text = mf.read_text(encoding="utf-8", errors="replace")
-                version = re.search(r"^VERSION\s*=\s*(\d+)", text, re.MULTILINE)
-                patchlevel = re.search(r"^PATCHLEVEL\s*=\s*(\d+)", text, re.MULTILINE)
-                sublevel = re.search(r"^SUBLEVEL\s*=\s*(\d+)", text, re.MULTILINE)
-                if version and patchlevel and sublevel:
-                    return (
-                        f"{version.group(1)}.{patchlevel.group(1)}.{sublevel.group(1)}"
-                    )
+                for line in mf.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines():
+                    if line.startswith("VERSION ="):
+                        v = line.split("=", 1)[1].strip()
+                    elif line.startswith("PATCHLEVEL ="):
+                        p = line.split("=", 1)[1].strip()
+                    elif line.startswith("SUBLEVEL ="):
+                        s = line.split("=", 1)[1].strip()
+                    elif line.startswith("EXTRAVERSION ="):
+                        extra = line.split("=", 1)[1].strip()
+                    if v and p and s and extra:
+                        break
             except Exception:
                 pass
-        return "Unknown"
+
+        base_ver = f"{v}.{p}.{s}" if (v and p and s) else "Unknown"
+        if extra:
+            base_ver += extra
+        if local_ver:
+            base_ver += local_ver
+        return base_ver
+
+    def _notify_build_started(self) -> None:
+        if self.telegram_enabled and self.telegram.is_configured:
+            host = self.config.host or socket.gethostname()
+            ksu_owner = (
+                extract_ksu_owner(self.config.ksu_setup)
+                if self.ksu_enabled
+                else "NO KSU"
+            )
+            nomount_status = "included" if self.nomount_enabled else "not included"
+            start_msg = (
+                f"Building Kernel (<i>{self.build_hash}</i>)\n"
+                f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
+                f"<b>Linux Version</b>: <b><code>{self.linux_version}</code></b>\n"
+                f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
+                f"<b>NoMount</b>: <b><code>{nomount_status}</code></b>\n"
+                f"<b>Compiler</b>: <b><code>{self.compiler_ver}</code></b>\n"
+                f"<b>Action Host</b>: <b><code>{host}</code></b>\n"
+                f"<b>Cores</b>: <b><code>{self.jobs}</code></b>"
+            )
+            self.telegram.send_message(start_msg)
 
     def _get_commit_hint(self) -> str:
         try:
@@ -249,28 +353,7 @@ class KernelBuilder:
             if (clang_dir / "bin" / "clang").is_file()
             else pathlib.Path(shutil.which("clang") or "clang")
         )
-        _, compiler_ver = ToolchainManager.test_clang_binary(clang_bin)
-
-        linux_version = self._get_linux_version()
-        host = self.config.host or socket.gethostname()
-        ksu_owner = (
-            extract_ksu_owner(self.config.ksu_setup) if self.ksu_enabled else "NO KSU"
-        )
-        nomount_status = "included" if self.nomount_enabled else "not included"
-
-        # Telegram start message (following docs/ExampleTexts.md)
-        if self.telegram_enabled and self.telegram.is_configured:
-            start_msg = (
-                f"Building Kernel (<i>{self.build_hash}</i>)\n"
-                f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
-                f"<b>Linux Version</b>: <b><code>{linux_version}</code></b>\n"
-                f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
-                f"<b>NoMount</b>: <b><code>{nomount_status}</code></b>\n"
-                f"<b>Compiler</b>: <b><code>{compiler_ver}</code></b>\n"
-                f"<b>Action Host</b>: <b><code>{host}</code></b>\n"
-                f"<b>Cores</b>: <b><code>{self.jobs}</code></b>"
-            )
-            self.telegram.send_message(start_msg)
+        _, self.compiler_ver = ToolchainManager.test_clang_binary(clang_bin)
 
         start_time = time.time()
         out_dir = self.source_dir / "out"
@@ -316,10 +399,16 @@ class KernelBuilder:
                 gofile_url = self.gofile.upload_file(zip_path)
 
             if self.telegram_enabled and self.telegram.is_configured:
+                ksu_owner = (
+                    extract_ksu_owner(self.config.ksu_setup)
+                    if self.ksu_enabled
+                    else "NO KSU"
+                )
+                nomount_status = "included" if self.nomount_enabled else "not included"
                 success_caption = (
                     f"Build Success (<i>{self.build_hash}</i>)\n"
                     f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
-                    f"<b>Linux Version</b>: <b><code>{linux_version}</code></b>\n"
+                    f"<b>Linux Version</b>: <b><code>{self.linux_version}</code></b>\n"
                     f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
                     f"<b>NoMount</b>: <b><code>{nomount_status}</code></b>\n"
                     f"<b>Build Time</b>: <b><code>{build_time_str}</code></b>\n"
@@ -439,6 +528,12 @@ class KernelBuilder:
                 lf,
                 error_context=f"Defconfig generation ({combined_configs})",
             )
+
+            # Resolve full kernel version (e.g. 4.19.325-cip20-st20-Skyron) now that out/.config exists
+            self.linux_version = self._get_linux_version(out_dir, env)
+
+            # Send Telegram building notification after defconfig generation
+            self._notify_build_started()
 
             # 2. KernelSU injection
             if self.ksu_enabled:

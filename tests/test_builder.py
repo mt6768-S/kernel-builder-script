@@ -59,3 +59,39 @@ def test_builder_positional_path_and_device(tmp_path, monkeypatch):
     assert builder.source_dir == tmp_path
     assert builder.defconfigs == ["vendor/mt6768_defconfig", "vendor/selene.config"]
     assert builder.device == "selene"
+
+
+def test_get_linux_version_full_name(tmp_path):
+    import argparse
+
+    from kbuild.builder import KernelBuilder
+
+    (tmp_path / "Makefile").write_text(
+        "VERSION = 4\nPATCHLEVEL = 19\nSUBLEVEL = 325\nEXTRAVERSION = -cip20-st20\n",
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True)
+    (out_dir / ".config").write_text(
+        'CONFIG_LOCALVERSION="-Skyron"\n', encoding="utf-8"
+    )
+
+    parsed_flags = argparse.Namespace(
+        clean=None,
+        ksu=None,
+        ksu_target=None,
+        nomount=None,
+        nomount_target=None,
+        telegram=False,
+        gofile=False,
+        jobs=4,
+        cc=None,
+        prefix=None,
+        ak3=None,
+        clang=None,
+        cleanup=False,
+    )
+
+    builder = KernelBuilder(parsed_flags, [str(tmp_path), "generic"])
+    full_ver = builder._get_linux_version(out_dir=out_dir)
+    assert full_ver == "4.19.325-cip20-st20-Skyron"
