@@ -66,5 +66,5 @@ Prints a formatted summary of the entire build environment to the console:
 * **Neutron Clang:** Shows the installed tag, CPU compatibility/version status, and directory path (or warns if not installed).
 * **System Clang (Fallback):** Checks if a system-wide `clang` is available on the machine and displays its path and version.
 * **AnyKernel3 Cache:** Reports whether `anykernel.sh` is cached inside the AnyKernel3 directory.
-* **Global Command:** Checks whether the global `pb` shortcut is linked in `~/.local/bin/pb`.
+* **Global Command:** Checks whether the global `kb` shortcut is linked in `~/.local/bin/kb`.
 * **Active Build Settings:** Reads `~/.kbuild/config.json` and displays the current state of Telegram uploads, GoFile uploads, clean builds, KernelSU integration (including its tag if enabled), and the configured `user@host` string.

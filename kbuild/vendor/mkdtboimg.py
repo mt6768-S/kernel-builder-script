@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import print_function
 """Tool for packing multiple DTB/DTBO files into a single image"""
 import argparse
 import fnmatch
@@ -24,14 +23,14 @@ from collections import namedtuple
 from sys import stdout
 
 
-class CompressionFormat(object):
+class CompressionFormat:
     """Enum representing DT compression format for a DT entry."""
     NO_COMPRESSION = 0x00
     ZLIB_COMPRESSION = 0x01
     GZIP_COMPRESSION = 0x02
 
 
-class DtEntry(object):
+class DtEntry:
     """Provides individual DT image file arguments to be added to a DTBO."""
     COMPRESSION_FORMAT_MASK = 0x0f
     REQUIRED_KEYS_V0 = (
@@ -149,7 +148,7 @@ class DtEntry(object):
         return self.__custom3
 
 
-class Dtbo(object):
+class Dtbo:
     _DTBO_MAGIC = 0xd7b7ab1e
     _ACPIO_MAGIC = 0x41435049
     _DT_TABLE_HEADER_SIZE = struct.calcsize('>8I')
@@ -210,7 +209,7 @@ class Dtbo(object):
         params = {}
         params['version'] = self.version
         params['dt_file'] = None
-        for i in range(0, self.dt_entry_count):
+        for i in range(self.dt_entry_count):
             dt_table_entry = self.__metadata[offset:offset + self._DT_ENTRY_HEADER_INTS]
             params['dt_size'] = dt_table_entry[0]
             params['dt_offset'] = dt_table_entry[1]
@@ -283,12 +282,12 @@ class Dtbo(object):
         )
         for key in _keys:
             if key == 'magic':
-                sb.append('{key:>20} = {value:08x}'.format(key=key, value=self.__dict__[key]))
+                sb.append(f'{key:>20} = {self.__dict__[key]:08x}')
             else:
-                sb.append('{key:>20} = {value:d}'.format(key=key, value=self.__dict__[key]))
+                sb.append(f'{key:>20} = {self.__dict__[key]:d}')
         count = 0
         for dt_entry in self.__dt_entries:
-            sb.append('dt_table_entry[{0:d}]:'.format(count))
+            sb.append(f'dt_table_entry[{count:d}]:')
             sb.append(str(dt_entry))
             count = count + 1
         return '\n'.join(sb)
@@ -514,8 +513,8 @@ def dump_dtbo_image(fin, argv):
     args = parse_dump_cmd_args(argv)
     if args.dtfilename:
         num_entries = len(dtbo.dt_entries)
-        for idx in range(0, num_entries):
-            with open(args.dtfilename + '.{:d}'.format(idx), 'wb') as fout:
+        for idx in range(num_entries):
+            with open(args.dtfilename + f'.{idx:d}', 'wb') as fout:
                 dtbo.extract_dt_file(idx, fout, args.decompress)
     args.outfile.write(str(dtbo) + '\n')
     args.outfile.close()
