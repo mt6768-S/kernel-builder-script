@@ -305,14 +305,14 @@ class KernelBuilder:
             )
             nomount_status = "included" if self.nomount_enabled else "not included"
             start_msg = (
-                f"Building Kernel (<i>{self.build_hash}</i>)\n"
-                f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
-                f"<b>Linux Version</b>: <b><code>{self.linux_version}</code></b>\n"
-                f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
-                f"<b>NoMount</b>: <b><code>{nomount_status}</code></b>\n"
-                f"<b>Compiler</b>: <b><code>{self.compiler_ver}</code></b>\n"
-                f"<b>Action Host</b>: <b><code>{host}</code></b>\n"
-                f"<b>Cores</b>: <b><code>{self.jobs}</code></b>"
+                f"Building Kernel (<i>{html.escape(self.build_hash)}</i>)\n"
+                f"<b>Device</b>: <b><code>{html.escape(self.device)}</code></b>\n"
+                f"<b>Linux Version</b>: <b><code>{html.escape(self.linux_version)}</code></b>\n"
+                f"<b>KernelSU</b>: <b><code>{html.escape(ksu_owner)}</code></b>\n"
+                f"<b>NoMount</b>: <b><code>{html.escape(nomount_status)}</code></b>\n"
+                f"<b>Compiler</b>: <b><code>{html.escape(self.compiler_ver)}</code></b>\n"
+                f"<b>Action Host</b>: <b><code>{html.escape(host)}</code></b>\n"
+                f"<b>Cores</b>: <b><code>{html.escape(str(self.jobs))}</code></b>"
             )
             self.telegram.send_message(start_msg)
 
@@ -406,14 +406,14 @@ class KernelBuilder:
                 )
                 nomount_status = "included" if self.nomount_enabled else "not included"
                 success_caption = (
-                    f"Build Success (<i>{self.build_hash}</i>)\n"
-                    f"<b>Device</b>: <b><code>{self.device}</code></b>\n"
-                    f"<b>Linux Version</b>: <b><code>{self.linux_version}</code></b>\n"
-                    f"<b>KernelSU</b>: <b><code>{ksu_owner}</code></b>\n"
-                    f"<b>NoMount</b>: <b><code>{nomount_status}</code></b>\n"
-                    f"<b>Build Time</b>: <b><code>{build_time_str}</code></b>\n"
-                    f"<b>SHA256</b>: <b><code>{sha256_hex}</code></b>\n"
-                    f"<pre>\n{commit_hint}\n</pre>"
+                    f"Build Success (<i>{html.escape(self.build_hash)}</i>)\n"
+                    f"<b>Device</b>: <b><code>{html.escape(self.device)}</code></b>\n"
+                    f"<b>Linux Version</b>: <b><code>{html.escape(self.linux_version)}</code></b>\n"
+                    f"<b>KernelSU</b>: <b><code>{html.escape(ksu_owner)}</code></b>\n"
+                    f"<b>NoMount</b>: <b><code>{html.escape(nomount_status)}</code></b>\n"
+                    f"<b>Build Time</b>: <b><code>{html.escape(build_time_str)}</code></b>\n"
+                    f"<b>SHA256</b>: <b><code>{html.escape(sha256_hex)}</code></b>\n"
+                    f"<pre>\n{html.escape(commit_hint)}\n</pre>"
                 )
                 self.telegram.upload_document(
                     zip_path, caption=success_caption, gofile_url=gofile_url

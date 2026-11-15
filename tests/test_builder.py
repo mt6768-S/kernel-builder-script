@@ -95,3 +95,28 @@ def test_get_linux_version_full_name(tmp_path):
     builder = KernelBuilder(parsed_flags, [str(tmp_path), "generic"])
     full_ver = builder._get_linux_version(out_dir=out_dir)
     assert full_ver == "4.19.325-cip20-st20-Skyron"
+
+
+def test_build_started_message_escapes_html_like_values(monkeypatch):
+    import argparse
+    from unittest.mock import Mock
+
+    from kbuild.builder import KernelBuilder
+
+    builder = object.__new__(KernelBuilder)
+    builder.telegram_enabled = True
+    builder.telegram = Mock(is_configured=True)
+    builder.config = argparse.Namespace(host="builder-host", ksu_setup=None)
+    builder.ksu_enabled = False
+    builder.nomount_enabled = False
+    builder.build_hash = "abc123"
+    builder.device = "selene"
+    builder.linux_version = "4.19.325-cip20-st20-Skyron"
+    builder.compiler_ver = "clang <vrdons>"
+    builder.jobs = 4
+
+    monkeypatch.setattr("kbuild.builder.socket.gethostname", lambda: "ignored")
+    builder._notify_build_started()
+
+    message = builder.telegram.send_message.call_args.args[0]
+    assert "clang &lt;vrdons&gt;" in message

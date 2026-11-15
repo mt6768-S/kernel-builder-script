@@ -137,6 +137,18 @@ def test_gofile_link_included_in_document_caption(tmp_path):
     assert "https://gofile.io/d/inline" in caption
 
 
+def test_caption_preserves_literal_html_like_text(tmp_path):
+    bot = _bot_mock()
+    test_file = tmp_path / "test.zip"
+    test_file.write_text("DATA", encoding="utf-8")
+
+    with patch("kbuild.upload.telegram.Bot", return_value=bot):
+        tg = TelegramUploader("123:ABC", "-100123")
+        assert tg.upload_document(test_file, caption="commit: <vrdons>") is True
+
+    assert bot.send_document.await_args.kwargs["caption"] == "commit: <vrdons>"
+
+
 def test_telegram_file_too_big_400_fallback(tmp_path):
     bot = _bot_mock()
     bot.send_document.side_effect = BadRequest("Bad Request: file is too big")

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import os
 import pathlib
 from collections.abc import Coroutine, Sequence
@@ -70,7 +71,8 @@ class TelegramUploader:
 
     @staticmethod
     def _gofile_note(url: str) -> str:
-        return f'<b>📦 Download (GoFile)</b>: <a href="{url}">{url}</a>'
+        safe_url = html.escape(url, quote=True)
+        return f'<b>📦 Download (GoFile)</b>: <a href="{safe_url}">{safe_url}</a>'
 
     @classmethod
     def _caption_with_gofile(cls, caption: str, gofile_url: str | None) -> str:
@@ -206,7 +208,7 @@ class TelegramUploader:
             )
             return False
 
-        base = caption or f"<b>{file_path.name}</b> ({size_mb:.1f} MB)"
+        base = caption or f"<b>{html.escape(file_path.name)}</b> ({size_mb:.1f} MB)"
         return self.send_message(self._caption_with_gofile(base, download_url))
 
     def _upload_single_file(
