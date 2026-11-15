@@ -16,9 +16,11 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
 from loguru import logger
 
@@ -362,6 +364,36 @@ class KernelBuilder:
             if self.nomount_mgr.injected:
                 self.nomount_mgr.cleanup()
 
+    def _run_make_command(
+        self,
+        cmd: list[str],
+        env: dict[str, str],
+        log_handle: Any = None,
+        error_context: str = "Command",
+    ) -> None:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=self.source_dir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            errors="replace",
+        )
+
+        if proc.stdout:
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                if log_handle:
+                    log_handle.write(line)
+                    log_handle.flush()
+
+        proc.wait()
+        if proc.returncode != 0:
+            raise BuildError(f"{error_context} failed with exit code {proc.returncode}")
+
     def _execute_build(
         self, clang_dir: pathlib.Path, out_dir: pathlib.Path, log_file: pathlib.Path
     ) -> None:
@@ -396,82 +428,43 @@ class KernelBuilder:
 
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. Defconfig step
-        for defcfg in self.defconfigs:
-            logger.info("{}", f"Generating config from: {defcfg}")
-            cmd = ["make", f"O={out_dir}", "ARCH=arm64", defcfg]
-            res = subprocess.run(
-                cmd, cwd=self.source_dir, env=env, capture_output=True, text=True
-            )
-            if res.returncode != 0:
-                raise BuildError(
-                    f"Defconfig generation failed for {defcfg}: {res.stderr.strip() or res.stdout.strip()}"
-                )
-
-        # 2. KernelSU injection
-        if self.ksu_enabled:
-            self.ksu_mgr.inject()
-
-        # 3. NoMount injection
-        if self.nomount_enabled:
-            self.nomount_mgr.inject()
-
-        # 4. Refresh config with olddefconfig if integrations modified .config
-        if self.ksu_enabled or self.nomount_enabled:
-            logger.info("{}", "Refreshing kernel configuration with olddefconfig...")
-            olddef_cmd = [
-                "make",
-                f"O={out_dir}",
-                "ARCH=arm64",
-                f"CC={self.cc}",
-                "olddefconfig",
-            ]
-            res = subprocess.run(
-                olddef_cmd, cwd=self.source_dir, env=env, capture_output=True, text=True
-            )
-            if res.returncode != 0:
-                raise BuildError(
-                    f"olddefconfig failed: {res.stderr.strip() or res.stdout.strip()}"
-                )
-            logger.success("{}", "Kernel configuration updated with olddefconfig.")
-
-        # 5. Compilation step
-        logger.info("{}", f"Starting kernel compilation: {' '.join(base_make_args)}")
         with open(log_file, "w", encoding="utf-8") as lf:
-            proc = subprocess.Popen(
-                base_make_args,
-                cwd=self.source_dir,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
+            # 1. Defconfig step (combined in a single make invocation)
+            combined_configs = " ".join(self.defconfigs)
+            logger.info("{}", f"Generating config from: {combined_configs}")
+            defcfg_cmd = base_make_args + self.defconfigs
+            self._run_make_command(
+                defcfg_cmd,
+                env,
+                lf,
+                error_context=f"Defconfig generation ({combined_configs})",
             )
 
-            if proc.stdout:
-                for line in proc.stdout:
-                    lf.write(line)
-                    lf.flush()
-                    # Surface high-signal compiler lines
-                    if any(
-                        kw in line
-                        for kw in (
-                            "CC ",
-                            "LD ",
-                            "AR ",
-                            "DTC ",
-                            "OBJCOPY ",
-                            "error:",
-                            "warning:",
-                        )
-                    ):
-                        console.print(f"[dim]{line.strip()}[/dim]")
+            # 2. KernelSU injection
+            if self.ksu_enabled:
+                self.ksu_mgr.inject()
 
-            proc.wait()
+            # 3. NoMount injection
+            if self.nomount_enabled:
+                self.nomount_mgr.inject()
 
-            if proc.returncode != 0:
-                raise BuildError(
-                    f"Kernel compilation failed with return code {proc.returncode}. Log saved to {log_file}"
+            # 4. Refresh config with olddefconfig if integrations modified .config
+            if self.ksu_enabled or self.nomount_enabled:
+                logger.info(
+                    "{}", "Refreshing kernel configuration with olddefconfig..."
                 )
+                olddef_cmd = base_make_args + ["olddefconfig"]
+                self._run_make_command(
+                    olddef_cmd, env, lf, error_context="olddefconfig"
+                )
+                logger.success("{}", "Kernel configuration updated with olddefconfig.")
+
+            # 5. Compilation step
+            logger.info(
+                "{}", f"Starting kernel compilation: {' '.join(base_make_args)}"
+            )
+            self._run_make_command(
+                base_make_args, env, lf, error_context="Kernel compilation"
+            )
 
         logger.success("{}", "Kernel compilation finished successfully.")
