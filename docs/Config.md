@@ -14,6 +14,7 @@ declares the schema and the CLI helpers. A project-local `.kb.json`, `kb.json`,
 | :--- | :--- | :--- | :--- |
 | `telegram` | bool | `true` | Enable/disable Telegram notifications & uploads |
 | `gofile` | bool | `false` | Enable/disable GoFile uploads |
+| `dtbo` | bool | `true` | Enable/disable DTBO image generation and packaging |
 | `clean` | bool | `true` | Clean output directory before build |
 | `ksu` | bool | `false` | Enable KernelSU integration |
 | `ksu_target` | string | `master` | KernelSU branch/tag/commit |

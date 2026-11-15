@@ -89,7 +89,7 @@ kb . selene --no-telegram --no-gofile
 | `[kernel_path]` | Path to kernel source tree (e.g. `.` for current directory) |
 | `<device / defconfig...>` | Target device (e.g. `selene`) or defconfig make targets |
 | `-j, --jobs <N>` | Number of parallel build threads (default: CPU core count) |
-| `--clean, --no-clean` | Clean build directory before compilation (`make mrproper`) |
+| `--clean, --no-clean, --dirty` | Clean build directory before compilation (`make mrproper`); `--dirty` is an alias for `--no-clean` |
 | `--ksu, --no-ksu` | Enable/disable KernelSU injection |
 | `--ksu-target <target>` | KernelSU branch, tag, or commit (default: `master`) |
 | `--nomount, --no-nomount`| Enable/disable NoMount injection |
@@ -143,6 +143,7 @@ Settings are saved in `~/.kbuild/config.json` with strict `0600` file permission
 {
   "telegram": true,
   "gofile": false,
+  "dtbo": true,
   "clean": true,
   "ksu": false,
   "nomount": false,

@@ -88,6 +88,7 @@ def parse_build_arguments(args: Sequence[str]) -> tuple[argparse.Namespace, list
     )
     parser.add_argument(
         "--no-clean",
+        "--dirty",
         dest="clean",
         action="store_false",
         help="Skip clean step (incremental build)",
@@ -216,6 +217,7 @@ def print_general_help() -> None:
 
 [bold]BUILD OPTIONS:[/bold]
   --clean, --no-clean         Clean output directory before building
+  --dirty                     Alias for --no-clean (incremental build)
   --ksu, --no-ksu             Inject KernelSU into kernel source
   --ksu-target <target>       KernelSU target branch/tag/commit (default: master)
   --nomount, --no-nomount     Inject NoMount into kernel source

@@ -18,6 +18,7 @@ from kbuild import console, paths
 SCHEMA = [
     ("telegram", Item(type=bool, default=True)),
     ("gofile", Item(type=bool, default=False)),
+    ("dtbo", Item(type=bool, default=True)),
     ("clean", Item(type=bool, default=True)),
     ("ksu", Item(type=bool, default=False)),
     ("nomount", Item(type=bool, default=False)),
@@ -50,7 +51,7 @@ SCHEMA = [
 
 SETTING_KEYS = {name for name, _ in SCHEMA}
 
-BOOL_KEYS = {"telegram", "gofile", "clean", "ksu", "nomount"}
+BOOL_KEYS = {"telegram", "gofile", "dtbo", "clean", "ksu", "nomount"}
 
 KEY_ALIASES = {
     "tg": "telegram",
@@ -218,6 +219,7 @@ def show_config(cfg: KbuildConfig | None = None) -> None:
     rows = [
         ("Telegram Upload", "telegram", format_bool(cfg.telegram)),
         ("GoFile Upload", "gofile", format_bool(cfg.gofile)),
+        ("DTBO Generation", "dtbo", format_bool(cfg.dtbo)),
         ("Clean Build", "clean", format_bool(cfg.clean)),
         ("KernelSU (KSU)", "ksu", format_bool(cfg.ksu)),
         ("KernelSU Target", "ksu_target", format_opt(cfg.ksu_target)),

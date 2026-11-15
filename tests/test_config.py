@@ -17,6 +17,7 @@ def test_default_config():
     cfg = KbuildConfig()
     assert cfg.telegram is True
     assert cfg.gofile is False
+    assert cfg.dtbo is True
     assert cfg.clean is True
     assert cfg.ksu is False
     assert cfg.nomount is False
@@ -30,9 +31,10 @@ def test_default_config():
 def test_boolean_coercion(tmp_path, monkeypatch):
     _patch_config_file(tmp_path, monkeypatch)
 
-    updated = update_config_from_pairs(["telegram=no", "gofile=enable"])
+    updated = update_config_from_pairs(["telegram=no", "gofile=enable", "dtbo=no"])
     assert updated.telegram is False
     assert updated.gofile is True
+    assert updated.dtbo is False
 
     unchanged = update_config_from_pairs(["telegram=invalid"])
     assert unchanged.telegram is False

@@ -118,6 +118,7 @@ def show_info() -> None:
 
     cfg_table.add_row("Telegram Upload", format_bool(cfg.telegram))
     cfg_table.add_row("GoFile Upload", format_bool(cfg.gofile))
+    cfg_table.add_row("DTBO Generation", format_bool(cfg.dtbo))
     cfg_table.add_row("Clean Build", format_bool(cfg.clean))
     cfg_table.add_row(
         "KernelSU (KSU)",

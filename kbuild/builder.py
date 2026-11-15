@@ -135,6 +135,7 @@ class KernelBuilder:
             if parsed_flags.gofile is not None
             else self.config.gofile
         )
+        self.dtbo_enabled = self.config.dtbo
         self.jobs = parsed_flags.jobs or self.config.jobs or os.cpu_count() or 4
         self.cc = parsed_flags.cc or self.config.cc or "clang"
         self.prefix = parsed_flags.prefix or self.config.zip_prefix
@@ -378,10 +379,11 @@ class KernelBuilder:
                     f"Build completed but no kernel image found in {boot_dir}"
                 )
 
-            # DTBO generation if available
-            dtbo_path = generate_dtbo_image(out_dir)
-            if dtbo_path:
-                artifacts.append(dtbo_path)
+            # DTBO generation if enabled and available
+            if self.dtbo_enabled:
+                dtbo_path = generate_dtbo_image(out_dir)
+                if dtbo_path:
+                    artifacts.append(dtbo_path)
 
             # Packaging AnyKernel3
             zip_path, sha256_hex = self.ak3_mgr.package(
