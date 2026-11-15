@@ -11,9 +11,10 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
-from kbuild import __version__
+from loguru import logger
+
+from kbuild import __version__, console
 from kbuild.config import load_config, update_config_from_pairs
-from kbuild.console import console, log_error, log_success
 from kbuild.doctor import run_doctor
 from kbuild.errors import KbuildError
 from kbuild.info import show_info
@@ -274,7 +275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cfg = load_config()
         ToolchainManager.ensure_clang(force=False)
         AnyKernelManager(cfg).ensure_ak3()
-        log_success("Toolchain and AnyKernel3 ready!")
+        logger.success("{}", "Toolchain and AnyKernel3 ready!")
         return 0
 
     if first == "update":
@@ -309,11 +310,11 @@ def dispatch_build(args: list[str], raw_argv: Sequence[str]) -> int:
         builder = KernelBuilder(parsed_flags=parsed_flags, positional_args=positional)
         return builder.run()
     except KbuildError as ke:
-        log_error(str(ke))
+        logger.error("{}", str(ke))
         return ke.exit_code
     except KeyboardInterrupt:
         console.print("\n[bold red]Build interrupted by user.[/bold red]")
         return 130
     except Exception as e:
-        log_error(f"Unexpected error: {e}")
+        logger.error("{}", f"Unexpected error: {e}")
         return 1

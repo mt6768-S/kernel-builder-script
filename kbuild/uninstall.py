@@ -9,8 +9,9 @@ import pathlib
 import shutil
 import sys
 
-from kbuild import __version__
-from kbuild.console import console, log_error, log_step, log_success, log_warn
+from loguru import logger
+
+from kbuild import __version__, console
 from kbuild.install import RC_MARKER_END, RC_MARKER_START
 from kbuild.paths import KBUILD_ROOT, get_symlink_path
 
@@ -43,7 +44,7 @@ def clean_shell_rc() -> None:
                     new_lines.append(line)
             clean_content = "".join(new_lines).rstrip() + "\n"
             rc_file.write_text(clean_content, encoding="utf-8")
-            log_success(f"Removed kbuild environment block from {rc_file}")
+            logger.success("{}", f"Removed kbuild environment block from {rc_file}")
 
 
 def run_uninstall(assume_yes: bool = False) -> int:
@@ -65,33 +66,33 @@ def run_uninstall(assume_yes: bool = False) -> int:
             console.print("[yellow]Uninstallation cancelled.[/yellow]")
             return 0
 
-    log_step("UNINSTALL", "Removing symlinks and shell integration...")
+    logger.log("STEP", "{}", "[UNINSTALL] Removing symlinks and shell integration...")
     symlink = get_symlink_path()
     if symlink.is_symlink() or symlink.is_file():
         try:
             symlink.unlink()
-            log_success(f"Removed symlink: {symlink}")
+            logger.success("{}", f"Removed symlink: {symlink}")
         except Exception as e:
-            log_warn(f"Failed to remove symlink {symlink}: {e}")
+            logger.warning("{}", f"Failed to remove symlink {symlink}: {e}")
 
     # Remove any old pb symlink if present
     old_pb = pathlib.Path.home() / ".local" / "bin" / "pb"
     if old_pb.is_symlink() or old_pb.is_file():
         try:
             old_pb.unlink()
-            log_success(f"Removed legacy pb symlink: {old_pb}")
+            logger.success("{}", f"Removed legacy pb symlink: {old_pb}")
         except Exception:
             pass
 
     clean_shell_rc()
 
     if KBUILD_ROOT.exists():
-        log_step("ROOT", f"Deleting {KBUILD_ROOT}...")
+        logger.log("STEP", "{}", f"[ROOT] Deleting {KBUILD_ROOT}...")
         try:
             shutil.rmtree(KBUILD_ROOT, ignore_errors=True)
-            log_success(f"Deleted {KBUILD_ROOT}")
+            logger.success("{}", f"Deleted {KBUILD_ROOT}")
         except Exception as e:
-            log_error(f"Failed to delete {KBUILD_ROOT}: {e}")
+            logger.error("{}", f"Failed to delete {KBUILD_ROOT}: {e}")
             return 1
 
     console.print()

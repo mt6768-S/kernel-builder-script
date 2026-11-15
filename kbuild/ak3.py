@@ -15,8 +15,9 @@ import tempfile
 import zipfile
 from collections.abc import Sequence
 
+from loguru import logger
+
 from kbuild.config import KbuildConfig
-from kbuild.console import log_info, log_step, log_success, log_warn
 from kbuild.errors import PackagingError
 from kbuild.paths import KBUILD_AK3_DIR, ensure_kbuild_dirs
 
@@ -30,7 +31,7 @@ class AnyKernelManager:
         if explicit_path_or_repo:
             p = pathlib.Path(explicit_path_or_repo).expanduser().resolve()
             if (p / "anykernel.sh").is_file():
-                log_info(f"Using explicit AnyKernel3 path: {p}")
+                logger.info("{}", f"Using explicit AnyKernel3 path: {p}")
                 return p
 
         ensure_kbuild_dirs()
@@ -42,7 +43,7 @@ class AnyKernelManager:
                 if (explicit_path_or_repo and "://" in explicit_path_or_repo)
                 else self.config.ak3_repo
             )
-            log_step("AK3", f"Cloning AnyKernel3 from {repo_url}...")
+            logger.log("STEP", "{}", f"[AK3] Cloning AnyKernel3 from {repo_url}...")
             res = subprocess.run(
                 ["git", "clone", "--depth=1", repo_url, str(self.ak3_dir)],
                 capture_output=True,
@@ -52,9 +53,9 @@ class AnyKernelManager:
                 raise PackagingError(
                     f"Failed to clone AnyKernel3: {res.stderr.strip() or res.stdout.strip()}"
                 )
-            log_success(f"AnyKernel3 cloned to {self.ak3_dir}")
+            logger.success("{}", f"AnyKernel3 cloned to {self.ak3_dir}")
         else:
-            log_info(f"Updating cached AnyKernel3 at {self.ak3_dir}...")
+            logger.info("{}", f"Updating cached AnyKernel3 at {self.ak3_dir}...")
             try:
                 res = subprocess.run(
                     ["git", "pull", "--ff-only"],
@@ -64,13 +65,16 @@ class AnyKernelManager:
                     timeout=15,
                 )
                 if res.returncode == 0:
-                    log_success("AnyKernel3 cache updated.")
+                    logger.success("{}", "AnyKernel3 cache updated.")
                 else:
-                    log_warn(
-                        f"AnyKernel3 git pull failed; using cached files: {res.stderr.strip()}"
+                    logger.warning(
+                        "{}",
+                        f"AnyKernel3 git pull failed; using cached files: {res.stderr.strip()}",
                     )
             except Exception as e:
-                log_warn(f"AnyKernel3 update failed ({e}); using cached files.")
+                logger.warning(
+                    "{}", f"AnyKernel3 update failed ({e}); using cached files."
+                )
 
         if not ak3_script.is_file():
             raise PackagingError(
@@ -100,7 +104,11 @@ class AnyKernelManager:
         zip_name = f"{prefix}-{device}-{timestamp}.zip"
         zip_path = pathlib.Path("/tmp") / zip_name
 
-        log_step("PACKAGE", f"Creating flashable AnyKernel3 zip: {zip_path.name}")
+        logger.log(
+            "STEP",
+            "{}",
+            f"[PACKAGE] Creating flashable AnyKernel3 zip: {zip_path.name}",
+        )
 
         with tempfile.TemporaryDirectory(prefix="kbuild_ak3_") as staging_str:
             staging_dir = pathlib.Path(staging_str)
@@ -119,7 +127,9 @@ class AnyKernelManager:
             for art in valid_artifacts:
                 dest = staging_dir / art.name
                 shutil.copy2(art, dest)
-                log_info(f"Added artifact: {art.name} ({art.stat().st_size} bytes)")
+                logger.info(
+                    "{}", f"Added artifact: {art.name} ({art.stat().st_size} bytes)"
+                )
 
             # Create flashable zip using Python zipfile
             with zipfile.ZipFile(
@@ -139,7 +149,7 @@ class AnyKernelManager:
         sha256_hex = hasher.hexdigest()
 
         zip_size_mb = zip_path.stat().st_size / (1024 * 1024)
-        log_success(f"Successfully packaged {zip_path} ({zip_size_mb:.2f} MB)")
-        log_info(f"SHA256: {sha256_hex}")
+        logger.success("{}", f"Successfully packaged {zip_path} ({zip_size_mb:.2f} MB)")
+        logger.info("{}", f"SHA256: {sha256_hex}")
 
         return zip_path, sha256_hex

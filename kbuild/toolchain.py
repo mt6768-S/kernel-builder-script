@@ -15,8 +15,8 @@ import subprocess
 from typing import Any
 
 import requests
+from loguru import logger
 
-from kbuild.console import log_info, log_step, log_success, log_warn
 from kbuild.errors import ToolchainError
 from kbuild.net import download_file
 from kbuild.paths import (
@@ -61,7 +61,7 @@ class ToolchainManager:
 
     @classmethod
     def get_latest_release_info(cls) -> dict[str, Any]:
-        log_info("Checking latest Neutron Clang release on GitHub...")
+        logger.info("{}", "Checking latest Neutron Clang release on GitHub...")
         tag_name: str | None = None
         asset_url: str | None = None
         asset_name: str | None = None
@@ -90,7 +90,7 @@ class ToolchainManager:
                         asset_size = asset.get("size", 0)
                         break
         except Exception as e:
-            log_warn(f"GitHub API check failed ({e}), checking redirect...")
+            logger.warning("{}", f"GitHub API check failed ({e}), checking redirect...")
 
         # 2. HTTP redirect fallback
         if not tag_name or not asset_url:
@@ -105,7 +105,7 @@ class ToolchainManager:
                     asset_name = f"neutron-clang-{tag_name}.tar.zst"
                     asset_url = f"https://github.com/{cls.REPO}/releases/download/{tag_name}/{asset_name}"
             except Exception as e:
-                log_warn(f"Redirect check failed: {e}")
+                logger.warning("{}", f"Redirect check failed: {e}")
 
         if not tag_name or not asset_url or not asset_name:
             raise ToolchainError(
@@ -179,7 +179,9 @@ export PATH="{clang_dir / "bin"}:$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
                 tag = (
                     installed_info.get("tag", "custom") if installed_info else "unknown"
                 )
-                log_info(f"Using Neutron Clang at: {KBUILD_CLANG_DIR} (Tag: {tag})")
+                logger.info(
+                    "{}", f"Using Neutron Clang at: {KBUILD_CLANG_DIR} (Tag: {tag})"
+                )
                 return KBUILD_CLANG_DIR
 
         rel_info = cls.get_latest_release_info()
@@ -191,18 +193,20 @@ export PATH="{clang_dir / "bin"}:$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
             and installed_info.get("tag") == latest_tag
             and not force
         ):
-            log_info(f"Neutron Clang is already up-to-date (Tag: {latest_tag})")
+            logger.info(
+                "{}", f"Neutron Clang is already up-to-date (Tag: {latest_tag})"
+            )
             return KBUILD_CLANG_DIR
 
-        log_step("TOOLCHAIN", f"Installing Neutron Clang ({latest_tag})")
+        logger.log("STEP", "{}", f"[TOOLCHAIN] Installing Neutron Clang ({latest_tag})")
         archive_path = KBUILD_ROOT / rel_info["asset_name"]
 
-        log_info(f"Downloading from: {rel_info['download_url']}")
+        logger.info("{}", f"Downloading from: {rel_info['download_url']}")
         download_file(
             rel_info["download_url"], archive_path, description="Neutron Clang"
         )
 
-        log_info(f"Extracting {archive_path.name} to {KBUILD_CLANG_DIR}...")
+        logger.info("{}", f"Extracting {archive_path.name} to {KBUILD_CLANG_DIR}...")
         if KBUILD_CLANG_DIR.exists():
             shutil.rmtree(KBUILD_CLANG_DIR, ignore_errors=True)
         KBUILD_CLANG_DIR.mkdir(parents=True, exist_ok=True)
@@ -230,12 +234,15 @@ export PATH="{clang_dir / "bin"}:$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
         cls.write_env_file(KBUILD_CLANG_DIR)
 
         if is_ok:
-            log_success(
-                f"Neutron Clang ({latest_tag}) installed successfully at {KBUILD_CLANG_DIR}!"
+            logger.success(
+                "{}",
+                f"Neutron Clang ({latest_tag}) installed successfully at {KBUILD_CLANG_DIR}!",
             )
-            log_info(f"Version: {ver_str}")
+            logger.info("{}", f"Version: {ver_str}")
         else:
-            log_warn(f"Neutron Clang downloaded, but binary reported: {ver_str}")
+            logger.warning(
+                "{}", f"Neutron Clang downloaded, but binary reported: {ver_str}"
+            )
 
         return KBUILD_CLANG_DIR
 
@@ -260,7 +267,7 @@ export PATH="{clang_dir / "bin"}:$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
         try:
             return cls.ensure_clang(force=False)
         except Exception as e:
-            log_warn(f"Could not prepare Neutron Clang: {e}")
+            logger.warning("{}", f"Could not prepare Neutron Clang: {e}")
 
         # Check system clang fallback
         sys_clang = shutil.which("clang")
@@ -268,7 +275,9 @@ export PATH="{clang_dir / "bin"}:$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
             sys_path = pathlib.Path(sys_clang).resolve()
             is_ok, ver = cls.test_clang_binary(sys_path)
             if is_ok:
-                log_warn(f"Falling back to system Clang: {ver} ({sys_clang})")
+                logger.warning(
+                    "{}", f"Falling back to system Clang: {ver} ({sys_clang})"
+                )
                 return sys_path.parent.parent
 
         raise ToolchainError(

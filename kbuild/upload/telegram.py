@@ -10,8 +10,7 @@ import pathlib
 from collections.abc import Sequence
 
 import requests
-
-from kbuild.console import log_error, log_info, log_success, log_warn
+from loguru import logger
 
 MAX_MEDIA_GROUP_BYTES = 48 * 1024 * 1024  # 48 MB
 
@@ -30,7 +29,9 @@ class TelegramUploader:
 
     def send_message(self, text: str) -> bool:
         if not self.is_configured:
-            log_warn("Telegram bot token or chat ID missing; skipping message.")
+            logger.warning(
+                "{}", "Telegram bot token or chat ID missing; skipping message."
+            )
             return False
 
         url = f"{self.base_url}/sendMessage"
@@ -44,10 +45,12 @@ class TelegramUploader:
             resp = requests.post(url, data=payload, timeout=20)
             if resp.status_code == 200 and resp.json().get("ok"):
                 return True
-            log_warn(f"Telegram sendMessage failed: {resp.status_code} {resp.text}")
+            logger.warning(
+                "{}", f"Telegram sendMessage failed: {resp.status_code} {resp.text}"
+            )
             return False
         except Exception as e:
-            log_warn(f"Telegram sendMessage request exception: {e}")
+            logger.warning("{}", f"Telegram sendMessage request exception: {e}")
             return False
 
     def upload_document(
@@ -67,12 +70,14 @@ class TelegramUploader:
         gofile_url: str | None = None,
     ) -> bool:
         if not self.is_configured:
-            log_warn("Telegram bot token or chat ID missing; skipping document upload.")
+            logger.warning(
+                "{}", "Telegram bot token or chat ID missing; skipping document upload."
+            )
             return False
 
         valid_files = [p for p in file_paths if p and p.is_file()]
         if not valid_files:
-            log_error("No valid files provided for Telegram upload.")
+            logger.error("{}", "No valid files provided for Telegram upload.")
             return False
 
         # If single file, direct upload
@@ -84,7 +89,9 @@ class TelegramUploader:
         if total_size < MAX_MEDIA_GROUP_BYTES:
             if self._upload_media_group(valid_files, caption):
                 return True
-            log_warn("sendMediaGroup failed; falling back to individual uploads...")
+            logger.warning(
+                "{}", "sendMediaGroup failed; falling back to individual uploads..."
+            )
 
         success = True
         for i, f in enumerate(valid_files):
@@ -104,8 +111,9 @@ class TelegramUploader:
         size_mb = file_path.stat().st_size / (1024 * 1024)
         download_url = gofile_url or GoFileUploader.upload_file(file_path)
         if not download_url:
-            log_error(
-                f"GoFile fallback upload failed for {file_path.name} ({size_mb:.2f} MB)."
+            logger.error(
+                "{}",
+                f"GoFile fallback upload failed for {file_path.name} ({size_mb:.2f} MB).",
             )
             return False
 
@@ -130,16 +138,19 @@ class TelegramUploader:
         size_mb = size_bytes / (1024 * 1024)
 
         if size_bytes > MAX_MEDIA_GROUP_BYTES:
-            log_warn(
+            logger.warning(
+                "{}",
                 f"{file_path.name} ({size_mb:.2f} MB) exceeds Telegram 48 MB limit. "
-                "Falling back to GoFile upload..."
+                "Falling back to GoFile upload...",
             )
             return self._fallback_gofile_upload(
                 file_path, caption, gofile_url=gofile_url
             )
 
         url = f"{self.base_url}/sendDocument"
-        log_info(f"Uploading {file_path.name} ({size_mb:.2f} MB) to Telegram...")
+        logger.info(
+            "{}", f"Uploading {file_path.name} ({size_mb:.2f} MB) to Telegram..."
+        )
 
         data = {
             "chat_id": self.chat_id,
@@ -153,26 +164,30 @@ class TelegramUploader:
                 files = {"document": (file_path.name, f)}
                 resp = requests.post(url, data=data, files=files, timeout=600)
             if resp.status_code == 200 and resp.json().get("ok"):
-                log_success(f"Uploaded {file_path.name} to Telegram successfully.")
+                logger.success(
+                    "{}", f"Uploaded {file_path.name} to Telegram successfully."
+                )
                 return True
 
             if resp.status_code == 400 and any(
                 phrase in resp.text.lower() for phrase in ("too big", "too large")
             ):
-                log_warn(
+                logger.warning(
+                    "{}",
                     f"Telegram rejected {file_path.name} due to file size limit. "
-                    "Falling back to GoFile..."
+                    "Falling back to GoFile...",
                 )
                 return self._fallback_gofile_upload(
                     file_path, caption, gofile_url=gofile_url
                 )
 
-            log_error(
-                f"Telegram upload failed for {file_path.name}: {resp.status_code} {resp.text}"
+            logger.error(
+                "{}",
+                f"Telegram upload failed for {file_path.name}: {resp.status_code} {resp.text}",
             )
             return False
         except Exception as e:
-            log_error(f"Telegram upload error for {file_path.name}: {e}")
+            logger.error("{}", f"Telegram upload error for {file_path.name}: {e}")
             return False
 
     def _upload_media_group(
@@ -204,15 +219,21 @@ class TelegramUploader:
                 "media": json.dumps(media_list),
             }
 
-            log_info(f"Uploading bundled artifacts ({len(files)} files) to Telegram...")
+            logger.info(
+                "{}", f"Uploading bundled artifacts ({len(files)} files) to Telegram..."
+            )
             resp = requests.post(url, data=data, files=files_dict, timeout=600)
             if resp.status_code == 200 and resp.json().get("ok"):
-                log_success("All build artifacts uploaded together to Telegram!")
+                logger.success(
+                    "{}", "All build artifacts uploaded together to Telegram!"
+                )
                 return True
-            log_warn(f"sendMediaGroup returned {resp.status_code}: {resp.text}")
+            logger.warning(
+                "{}", f"sendMediaGroup returned {resp.status_code}: {resp.text}"
+            )
             return False
         except Exception as e:
-            log_warn(f"sendMediaGroup error: {e}")
+            logger.warning("{}", f"sendMediaGroup error: {e}")
             return False
         finally:
             for fp in open_files:

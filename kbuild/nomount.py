@@ -9,8 +9,8 @@ import pathlib
 import subprocess
 
 import requests
+from loguru import logger
 
-from kbuild.console import log_info, log_step, log_success, log_warn
 from kbuild.errors import IntegrationError
 
 
@@ -22,7 +22,11 @@ class NoMountManager:
         self.injected = False
 
     def inject(self) -> None:
-        log_step("NOMOUNT", f"Injecting NoMount ({self.target}) from {self.setup_url}")
+        logger.log(
+            "STEP",
+            "{}",
+            f"[NOMOUNT] Injecting NoMount ({self.target}) from {self.setup_url}",
+        )
 
         try:
             resp = requests.get(
@@ -45,7 +49,7 @@ class NoMountManager:
 
         if res.stdout:
             for line in res.stdout.splitlines():
-                log_info(f"[NOMOUNT] {line}")
+                logger.info("{}", f"[NOMOUNT] {line}")
 
         if res.returncode != 0:
             err = res.stderr.strip() or res.stdout.strip()
@@ -54,7 +58,7 @@ class NoMountManager:
             )
 
         self.injected = True
-        log_success("NoMount setup script executed successfully.")
+        logger.success("{}", "NoMount setup script executed successfully.")
 
         # Update out/.config if it exists
         defconfig_path = self.source_dir / "out" / ".config"
@@ -91,12 +95,14 @@ class NoMountManager:
             with open(defconfig_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
 
-            log_success("NoMount configuration flags written to out/.config")
+            logger.success("{}", "NoMount configuration flags written to out/.config")
         except Exception as e:
-            log_warn(f"Failed to write NoMount config flags to {defconfig_path}: {e}")
+            logger.warning(
+                "{}", f"Failed to write NoMount config flags to {defconfig_path}: {e}"
+            )
 
     def cleanup(self) -> None:
-        log_info(f"Cleaning up NoMount in {self.source_dir}...")
+        logger.info("{}", f"Cleaning up NoMount in {self.source_dir}...")
         try:
             resp = requests.get(
                 self.setup_url, headers={"User-Agent": "kbuild"}, timeout=15
@@ -109,8 +115,8 @@ class NoMountManager:
                     capture_output=True,
                     text=True,
                 )
-                log_success("NoMount cleanup finished.")
+                logger.success("{}", "NoMount cleanup finished.")
         except Exception as e:
-            log_warn(f"NoMount cleanup error: {e}")
+            logger.warning("{}", f"NoMount cleanup error: {e}")
         finally:
             self.injected = False

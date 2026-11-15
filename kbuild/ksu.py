@@ -10,8 +10,8 @@ import re
 import subprocess
 
 import requests
+from loguru import logger
 
-from kbuild.console import log_info, log_step, log_success, log_warn
 from kbuild.errors import IntegrationError
 
 
@@ -39,7 +39,11 @@ class KernelSUManager:
         self.injected = False
 
     def inject(self) -> None:
-        log_step("KSU", f"Injecting KernelSU ({self.target}) from {self.setup_url}")
+        logger.log(
+            "STEP",
+            "{}",
+            f"[KSU] Injecting KernelSU ({self.target}) from {self.setup_url}",
+        )
 
         try:
             resp = requests.get(
@@ -62,7 +66,7 @@ class KernelSUManager:
 
         if res.stdout:
             for line in res.stdout.splitlines():
-                log_info(f"[KSU] {line}")
+                logger.info("{}", f"[KSU] {line}")
 
         if res.returncode != 0:
             err = res.stderr.strip() or res.stdout.strip()
@@ -71,7 +75,7 @@ class KernelSUManager:
             )
 
         self.injected = True
-        log_success("KernelSU setup script executed successfully.")
+        logger.success("{}", "KernelSU setup script executed successfully.")
 
         # Update out/.config if it exists
         defconfig_path = self.source_dir / "out" / ".config"
@@ -111,12 +115,14 @@ class KernelSUManager:
             with open(defconfig_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
 
-            log_success("KernelSU configuration flags written to out/.config")
+            logger.success("{}", "KernelSU configuration flags written to out/.config")
         except Exception as e:
-            log_warn(f"Failed to write KernelSU config flags to {defconfig_path}: {e}")
+            logger.warning(
+                "{}", f"Failed to write KernelSU config flags to {defconfig_path}: {e}"
+            )
 
     def cleanup(self) -> None:
-        log_info(f"Cleaning up KernelSU in {self.source_dir}...")
+        logger.info("{}", f"Cleaning up KernelSU in {self.source_dir}...")
         try:
             resp = requests.get(
                 self.setup_url, headers={"User-Agent": "kbuild"}, timeout=15
@@ -129,8 +135,8 @@ class KernelSUManager:
                     capture_output=True,
                     text=True,
                 )
-                log_success("KernelSU cleanup finished.")
+                logger.success("{}", "KernelSU cleanup finished.")
         except Exception as e:
-            log_warn(f"KernelSU cleanup error: {e}")
+            logger.warning("{}", f"KernelSU cleanup error: {e}")
         finally:
             self.injected = False

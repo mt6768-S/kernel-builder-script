@@ -11,7 +11,9 @@ import os
 import pathlib
 from typing import Any
 
-from kbuild.console import console, log_error, log_success, log_warn
+from loguru import logger
+
+from kbuild import console
 from kbuild.errors import ConfigError
 from kbuild.paths import (
     KBUILD_CONFIG_FILE,
@@ -88,7 +90,7 @@ def load_config(cwd: pathlib.Path | None = None) -> KbuildConfig:
                         saved.pop(deprecated, None)
                     cfg_data.update(saved)
         except Exception as e:
-            log_warn(f"Failed to read {KBUILD_CONFIG_FILE}: {e}")
+            logger.warning("{}", f"Failed to read {KBUILD_CONFIG_FILE}: {e}")
 
     local_path = find_local_config(cwd)
     if local_path:
@@ -106,7 +108,7 @@ def load_config(cwd: pathlib.Path | None = None) -> KbuildConfig:
                         local_data.pop(deprecated, None)
                     cfg_data.update(local_data)
         except Exception as e:
-            log_warn(f"Failed to read local config {local_path}: {e}")
+            logger.warning("{}", f"Failed to read local config {local_path}: {e}")
 
     return KbuildConfig.from_dict(cfg_data)
 
@@ -142,15 +144,16 @@ def update_config_from_pairs(pairs: list[str]) -> KbuildConfig:
     if first in ("reset", "default", "defaults"):
         cfg = KbuildConfig()
         save_config(cfg)
-        log_success("Configuration reset to default values.")
+        logger.success("{}", "Configuration reset to default values.")
         show_config(cfg)
         return cfg
 
     updated_count = 0
     for item in pairs:
         if "=" not in item:
-            log_warn(
-                f"Ignored invalid config pair '{item}'. Expected format: key=value"
+            logger.warning(
+                "{}",
+                f"Ignored invalid config pair '{item}'. Expected format: key=value",
             )
             continue
 
@@ -209,12 +212,12 @@ def update_config_from_pairs(pairs: list[str]) -> KbuildConfig:
                 )
                 updated_count += 1
             else:
-                log_warn(f"Unknown config key '{key}'. Ignored.")
+                logger.warning("{}", f"Unknown config key '{key}'. Ignored.")
         except ConfigError as ce:
-            log_error(str(ce))
+            logger.error("{}", str(ce))
 
     save_config(cfg)
-    log_success(f"Updated {updated_count} setting(s) in {KBUILD_CONFIG_FILE}")
+    logger.success("{}", f"Updated {updated_count} setting(s) in {KBUILD_CONFIG_FILE}")
     show_config(cfg)
     return cfg
 

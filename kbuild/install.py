@@ -10,9 +10,10 @@ import shutil
 import subprocess
 import sys
 
-from kbuild import __version__
+from loguru import logger
+
+from kbuild import __version__, console
 from kbuild.config import KbuildConfig, save_config
-from kbuild.console import console, log_error, log_info, log_step, log_success
 from kbuild.paths import (
     KBUILD_APP_DIR,
     KBUILD_BIN_DIR,
@@ -37,7 +38,7 @@ def setup_filesystem_and_app() -> None:
     current_repo = pathlib.Path(__file__).parent.parent.resolve()
 
     if current_repo != KBUILD_APP_DIR.resolve():
-        log_info(f"Setting up kbuild app repository at {KBUILD_APP_DIR}...")
+        logger.info("{}", f"Setting up kbuild app repository at {KBUILD_APP_DIR}...")
         if not KBUILD_APP_DIR.exists():
             if (current_repo / "pyproject.toml").is_file():
                 shutil.copytree(
@@ -66,15 +67,15 @@ def setup_filesystem_and_app() -> None:
                     check=True,
                 )
         else:
-            log_info(f"App directory {KBUILD_APP_DIR} already exists.")
+            logger.info("{}", f"App directory {KBUILD_APP_DIR} already exists.")
 
 
 def setup_virtualenv() -> None:
-    log_step("VENV", "Preparing Python virtual environment...")
+    logger.log("STEP", "{}", "[VENV] Preparing Python virtual environment...")
     pip_bin = KBUILD_VENV_DIR / "bin" / "pip"
 
     if not pip_bin.is_file():
-        log_info(f"Creating virtualenv at {KBUILD_VENV_DIR}...")
+        logger.info("{}", f"Creating virtualenv at {KBUILD_VENV_DIR}...")
         subprocess.run([sys.executable, "-m", "venv", str(KBUILD_VENV_DIR)], check=True)
 
     app_dir = (
@@ -83,14 +84,14 @@ def setup_virtualenv() -> None:
         else pathlib.Path(__file__).parent.parent.resolve()
     )
 
-    log_info(f"Installing kbuild package in editable mode from {app_dir}...")
+    logger.info("{}", f"Installing kbuild package in editable mode from {app_dir}...")
     subprocess.run([str(pip_bin), "install", "--upgrade", "pip"], check=True)
     subprocess.run([str(pip_bin), "install", "-e", str(app_dir)], check=True)
-    log_success("Virtualenv configured successfully.")
+    logger.success("{}", "Virtualenv configured successfully.")
 
 
 def create_bin_wrappers_and_symlinks() -> None:
-    log_step("BIN", "Setting up CLI executable and symlinks...")
+    logger.log("STEP", "{}", "[BIN] Setting up CLI executable and symlinks...")
     kb_wrapper = KBUILD_BIN_DIR / "kb"
 
     wrapper_content = f"""#!/usr/bin/env bash
@@ -99,7 +100,7 @@ exec "{KBUILD_VENV_DIR}/bin/kb" "$@"
     with open(kb_wrapper, "w", encoding="utf-8") as f:
         f.write(wrapper_content)
     kb_wrapper.chmod(0o755)
-    log_success(f"Created executable wrapper at {kb_wrapper}")
+    logger.success("{}", f"Created executable wrapper at {kb_wrapper}")
 
     # Symlink ~/.local/bin/kb
     local_bin = pathlib.Path.home() / ".local" / "bin"
@@ -110,11 +111,13 @@ exec "{KBUILD_VENV_DIR}/bin/kb" "$@"
         symlink_path.unlink()
 
     symlink_path.symlink_to(kb_wrapper)
-    log_success(f"Created symlink: {symlink_path} -> {kb_wrapper}")
+    logger.success("{}", f"Created symlink: {symlink_path} -> {kb_wrapper}")
 
 
 def configure_shell_rc() -> None:
-    log_step("SHELL", "Configuring shell startup scripts (.bashrc, .zshrc)...")
+    logger.log(
+        "STEP", "{}", "[SHELL] Configuring shell startup scripts (.bashrc, .zshrc)..."
+    )
     home = pathlib.Path.home()
     rc_targets = [home / ".bashrc", home / ".zshrc"]
 
@@ -144,11 +147,11 @@ def configure_shell_rc() -> None:
                     new_lines.append(line)
             clean_content = "".join(new_lines).rstrip() + "\n\n" + SHELL_RC_BLOCK + "\n"
             rc_file.write_text(clean_content, encoding="utf-8")
-            log_success(f"Updated kbuild environment block in {rc_file}")
+            logger.success("{}", f"Updated kbuild environment block in {rc_file}")
         else:
             updated = content.rstrip() + "\n\n" + SHELL_RC_BLOCK + "\n"
             rc_file.write_text(updated, encoding="utf-8")
-            log_success(f"Appended kbuild environment block to {rc_file}")
+            logger.success("{}", f"Appended kbuild environment block to {rc_file}")
 
 
 def run_install() -> int:
@@ -167,7 +170,9 @@ def run_install() -> int:
         # Initialize config if not existing
         if not KBUILD_CONFIG_FILE.is_file():
             save_config(KbuildConfig())
-            log_success(f"Initialized default configuration at {KBUILD_CONFIG_FILE}")
+            logger.success(
+                "{}", f"Initialized default configuration at {KBUILD_CONFIG_FILE}"
+            )
 
         console.print()
         console.rule("[bold green]Installation Complete[/bold green]", style="green")
@@ -179,7 +184,7 @@ def run_install() -> int:
             subprocess.run([str(kb_bin), "doctor"], check=False)
         return 0
     except Exception as e:
-        log_error(f"Installation failed: {e}")
+        logger.error("{}", f"Installation failed: {e}")
         return 1
 
 

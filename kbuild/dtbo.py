@@ -9,7 +9,7 @@ import pathlib
 import subprocess
 import sys
 
-from kbuild.console import log_step, log_success, log_warn
+from loguru import logger
 
 
 def generate_dtbo_image(out_dir: pathlib.Path) -> pathlib.Path | None:
@@ -25,7 +25,11 @@ def generate_dtbo_image(out_dir: pathlib.Path) -> pathlib.Path | None:
     if not dtbo_files:
         return None
 
-    log_step("DTBO", f"Found {len(dtbo_files)} DTBO file(s), generating dtbo.img...")
+    logger.log(
+        "STEP",
+        "{}",
+        f"[DTBO] Found {len(dtbo_files)} DTBO file(s), generating dtbo.img...",
+    )
     output_dtbo = out_dir / "arch" / "arm64" / "boot" / "dtbo.img"
 
     vendor_tool = pathlib.Path(__file__).parent / "vendor" / "mkdtboimg.py"
@@ -40,11 +44,12 @@ def generate_dtbo_image(out_dir: pathlib.Path) -> pathlib.Path | None:
 
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode == 0 and output_dtbo.is_file():
-        log_success(
-            f"Generated DTBO image at {output_dtbo} ({output_dtbo.stat().st_size} bytes)"
+        logger.success(
+            "{}",
+            f"Generated DTBO image at {output_dtbo} ({output_dtbo.stat().st_size} bytes)",
         )
         return output_dtbo
     else:
         err = res.stderr.strip() or res.stdout.strip()
-        log_warn(f"Failed to generate dtbo.img: {err}")
+        logger.warning("{}", f"Failed to generate dtbo.img: {err}")
         return None

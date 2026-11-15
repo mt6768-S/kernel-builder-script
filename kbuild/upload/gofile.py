@@ -8,8 +8,7 @@ import pathlib
 from collections.abc import Sequence
 
 import requests
-
-from kbuild.console import log_error, log_info, log_success, log_warn
+from loguru import logger
 
 
 class GoFileUploader:
@@ -27,7 +26,7 @@ class GoFileUploader:
                 if servers:
                     return servers[0].get("name")
         except Exception as e:
-            log_warn(f"Failed to fetch GoFile servers list: {e}")
+            logger.warning("{}", f"Failed to fetch GoFile servers list: {e}")
         return None
 
     @classmethod
@@ -43,7 +42,7 @@ class GoFileUploader:
 
         server = cls.get_upload_server()
         if not server:
-            log_error("Could not determine GoFile upload server.")
+            logger.error("{}", "Could not determine GoFile upload server.")
             return []
 
         upload_url = f"https://{server}.gofile.io/uploadFile"
@@ -51,7 +50,7 @@ class GoFileUploader:
         download_pages = []
 
         for fpath in valid_files:
-            log_info(f"Uploading {fpath.name} to GoFile ({server})...")
+            logger.info("{}", f"Uploading {fpath.name} to GoFile ({server})...")
             try:
                 data = {}
                 if parent_folder_id:
@@ -70,10 +69,12 @@ class GoFileUploader:
                     parent_folder_id = res_data.get("parentFolder") or parent_folder_id
                     if d_page:
                         download_pages.append(d_page)
-                        log_success(f"GoFile download link: {d_page}")
+                        logger.success("{}", f"GoFile download link: {d_page}")
                 else:
-                    log_error(f"GoFile upload failed: {resp.status_code} {resp.text}")
+                    logger.error(
+                        "{}", f"GoFile upload failed: {resp.status_code} {resp.text}"
+                    )
             except Exception as e:
-                log_error(f"GoFile upload exception for {fpath.name}: {e}")
+                logger.error("{}", f"GoFile upload exception for {fpath.name}: {e}")
 
         return download_pages

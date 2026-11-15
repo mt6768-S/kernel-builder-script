@@ -20,9 +20,11 @@ import time
 import uuid
 from collections.abc import Sequence
 
+from loguru import logger
+
+from kbuild import console
 from kbuild.ak3 import AnyKernelManager
 from kbuild.config import KbuildConfig, load_config
-from kbuild.console import console, log_info, log_step, log_success
 from kbuild.dtbo import generate_dtbo_image
 from kbuild.errors import BuildError, PreflightError
 from kbuild.ksu import KernelSUManager, extract_ksu_owner
@@ -225,10 +227,14 @@ class KernelBuilder:
 
     def run(self) -> int:
         if self.cleanup_only:
-            log_step("CLEANUP", "Cleaning up KernelSU and NoMount integrations...")
+            logger.log(
+                "STEP",
+                "{}",
+                "[CLEANUP] Cleaning up KernelSU and NoMount integrations...",
+            )
             self.ksu_mgr.cleanup()
             self.nomount_mgr.cleanup()
-            log_success("Integrations cleaned up successfully.")
+            logger.success("{}", "Integrations cleaned up successfully.")
             return 0
 
         # Resolve toolchain
@@ -322,8 +328,10 @@ class KernelBuilder:
                     zip_path, caption=success_caption, gofile_url=gofile_url
                 )
 
-            log_step(
-                "COMPLETE", f"Kernel build and packaging completed in {build_time_str}!"
+            logger.log(
+                "STEP",
+                "{}",
+                f"[COMPLETE] Kernel build and packaging completed in {build_time_str}!",
             )
             console.print(f"[bold green]Artifact:[/bold green] {zip_path}")
             return 0
@@ -358,9 +366,10 @@ class KernelBuilder:
     def _execute_build(
         self, clang_dir: pathlib.Path, out_dir: pathlib.Path, log_file: pathlib.Path
     ) -> None:
-        log_step(
-            "BUILD",
-            f"Building kernel for device '{self.device}' with {self.jobs} cores...",
+        logger.log(
+            "STEP",
+            "{}",
+            f"[BUILD] Building kernel for device '{self.device}' with {self.jobs} cores...",
         )
 
         env = os.environ.copy()
@@ -382,7 +391,7 @@ class KernelBuilder:
         ]
 
         if self.clean:
-            log_info(f"Cleaning build directory: {out_dir}")
+            logger.info("{}", f"Cleaning build directory: {out_dir}")
             if out_dir.exists():
                 shutil.rmtree(out_dir, ignore_errors=True)
 
@@ -390,7 +399,7 @@ class KernelBuilder:
 
         # 1. Defconfig step
         for defcfg in self.defconfigs:
-            log_info(f"Generating config from: {defcfg}")
+            logger.info("{}", f"Generating config from: {defcfg}")
             cmd = ["make", f"O={out_dir}", "ARCH=arm64", defcfg]
             res = subprocess.run(
                 cmd, cwd=self.source_dir, env=env, capture_output=True, text=True
@@ -410,7 +419,7 @@ class KernelBuilder:
 
         # 4. Refresh config with olddefconfig if integrations modified .config
         if self.ksu_enabled or self.nomount_enabled:
-            log_info("Refreshing kernel configuration with olddefconfig...")
+            logger.info("{}", "Refreshing kernel configuration with olddefconfig...")
             olddef_cmd = [
                 "make",
                 f"O={out_dir}",
@@ -425,10 +434,10 @@ class KernelBuilder:
                 raise BuildError(
                     f"olddefconfig failed: {res.stderr.strip() or res.stdout.strip()}"
                 )
-            log_success("Kernel configuration updated with olddefconfig.")
+            logger.success("{}", "Kernel configuration updated with olddefconfig.")
 
         # 5. Compilation step
-        log_info(f"Starting kernel compilation: {' '.join(base_make_args)}")
+        logger.info("{}", f"Starting kernel compilation: {' '.join(base_make_args)}")
         with open(log_file, "w", encoding="utf-8") as lf:
             proc = subprocess.Popen(
                 base_make_args,
@@ -466,4 +475,4 @@ class KernelBuilder:
                     f"Kernel compilation failed with return code {proc.returncode}. Log saved to {log_file}"
                 )
 
-        log_success("Kernel compilation finished successfully.")
+        logger.success("{}", "Kernel compilation finished successfully.")

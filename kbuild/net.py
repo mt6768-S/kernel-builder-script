@@ -18,8 +18,7 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 
-from kbuild import __version__
-from kbuild.console import console
+from kbuild import __version__, console
 
 DEFAULT_USER_AGENT = f"kbuild/{__version__} (Linux x86_64)"
 

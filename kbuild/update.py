@@ -10,8 +10,9 @@ import pathlib
 import subprocess
 import time
 
-from kbuild import __version__
-from kbuild.console import console, log_error, log_info, log_success, log_warn
+from loguru import logger
+
+from kbuild import __version__, console
 from kbuild.paths import (
     KBUILD_APP_DIR,
     KBUILD_UPDATE_CACHE_FILE,
@@ -127,10 +128,10 @@ def perform_update() -> bool:
         KBUILD_APP_DIR if (KBUILD_APP_DIR / ".git").is_dir() else pathlib.Path.cwd()
     )
     if not (target_repo / ".git").is_dir():
-        log_error(f"Cannot update: {target_repo} is not a git repository.")
+        logger.error("{}", f"Cannot update: {target_repo} is not a git repository.")
         return False
 
-    log_info(f"Updating kbuild in {target_repo}...")
+    logger.info("{}", f"Updating kbuild in {target_repo}...")
     try:
         pull_res = subprocess.run(
             ["git", "pull", "--ff-only"],
@@ -139,20 +140,21 @@ def perform_update() -> bool:
             text=True,
         )
         if pull_res.returncode != 0:
-            log_error(
-                f"Git pull failed: {pull_res.stderr.strip() or pull_res.stdout.strip()}"
+            logger.error(
+                "{}",
+                f"Git pull failed: {pull_res.stderr.strip() or pull_res.stdout.strip()}",
             )
             return False
-        log_success("Git repository updated successfully.")
+        logger.success("{}", "Git repository updated successfully.")
         print(pull_res.stdout.strip())
     except Exception as e:
-        log_error(f"Failed to execute git pull: {e}")
+        logger.error("{}", f"Failed to execute git pull: {e}")
         return False
 
     # Sync venv if ~/.kbuild/venv exists
     pip_bin = KBUILD_VENV_DIR / "bin" / "pip"
     if pip_bin.is_file():
-        log_info(f"Syncing virtual environment at {KBUILD_VENV_DIR}...")
+        logger.info("{}", f"Syncing virtual environment at {KBUILD_VENV_DIR}...")
         try:
             pip_res = subprocess.run(
                 [str(pip_bin), "install", "-e", str(target_repo)],
@@ -161,13 +163,14 @@ def perform_update() -> bool:
                 timeout=120,
             )
             if pip_res.returncode == 0:
-                log_success("kbuild dependencies synchronized successfully.")
+                logger.success("{}", "kbuild dependencies synchronized successfully.")
             else:
-                log_warn(
-                    f"pip install returned code {pip_res.returncode}: {pip_res.stderr.strip()}"
+                logger.warning(
+                    "{}",
+                    f"pip install returned code {pip_res.returncode}: {pip_res.stderr.strip()}",
                 )
         except Exception as e:
-            log_warn(f"Failed to sync virtual environment: {e}")
+            logger.warning("{}", f"Failed to sync virtual environment: {e}")
 
     # Invalidate update cache after update
     if KBUILD_UPDATE_CACHE_FILE.is_file():

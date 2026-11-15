@@ -13,8 +13,7 @@ import sys
 
 from rich.table import Table
 
-from kbuild import __version__
-from kbuild.console import console
+from kbuild import __version__, console
 from kbuild.paths import (
     KBUILD_AK3_DIR,
     KBUILD_CLANG_DIR,
