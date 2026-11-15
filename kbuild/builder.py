@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import getpass
+import html
 import os
 import pathlib
 import re
@@ -25,6 +26,7 @@ from kbuild.console import console, log_info, log_step, log_success
 from kbuild.dtbo import generate_dtbo_image
 from kbuild.errors import BuildError, PreflightError
 from kbuild.ksu import KernelSUManager, extract_ksu_owner
+from kbuild.log_parser import extract_build_errors
 from kbuild.nomount import NoMountManager
 from kbuild.toolchain import ToolchainManager
 from kbuild.upload.gofile import GoFileUploader
@@ -324,22 +326,22 @@ class KernelBuilder:
             return 0
 
         except Exception as e:
-            # Handle failure: read log tail and send Telegram notification
+            # Handle failure: extract targeted error context and notify Telegram
             log_tail = ""
             if log_file.is_file():
                 try:
-                    lines = log_file.read_text(
-                        encoding="utf-8", errors="replace"
-                    ).splitlines()
-                    log_tail = "\n".join(lines[-60:])
+                    log_tail = extract_build_errors(log_file)
                 except Exception:
                     pass
 
             if self.telegram_enabled and self.telegram.is_configured:
+                escaped_tail = html.escape(log_tail or str(e))
                 fail_msg = (
                     f"### Build Failed (<i>{self.build_hash}</i>)\n"
-                    f"<pre>\n{log_tail or str(e)}\n</pre>"
+                    f"<pre>\n{escaped_tail}\n</pre>"
                 )
+                if log_file.is_file():
+                    self.telegram.upload_document(log_file)
                 self.telegram.send_message(fail_msg)
 
             raise
