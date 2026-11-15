@@ -3,6 +3,10 @@
 ## Overview
 
 Stores user configuration in `~/.kbuild/config.json` with secure `0600` permissions.
+Loading, type coercion, and JSON persistence are handled by the
+[`configmanager`](https://pypi.org/project/configmanager/) package; kbuild only
+declares the schema and the CLI helpers. A project-local `.kb.json`, `kb.json`,
+`.pb.json`, or `pb.json` overrides the global values.
 
 ## Keys & Defaults
 

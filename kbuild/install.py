@@ -13,7 +13,6 @@ import sys
 from loguru import logger
 
 from kbuild import __version__, console
-from kbuild.config import KbuildConfig, save_config
 from kbuild.paths import (
     KBUILD_APP_DIR,
     KBUILD_BIN_DIR,
@@ -21,6 +20,7 @@ from kbuild.paths import (
     KBUILD_VENV_DIR,
     ensure_kbuild_dirs,
 )
+from kbuild.settings import KbuildConfig, save_config
 
 RC_MARKER_START = "# >>> kbuild initialize >>>"
 RC_MARKER_END = "# <<< kbuild initialize <<<"

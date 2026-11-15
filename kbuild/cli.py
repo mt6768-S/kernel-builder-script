@@ -14,10 +14,10 @@ from collections.abc import Sequence
 from loguru import logger
 
 from kbuild import __version__, console
-from kbuild.config import load_config, update_config_from_pairs
 from kbuild.doctor import run_doctor
 from kbuild.errors import KbuildError
 from kbuild.info import show_info
+from kbuild.settings import load_config, update_config_from_pairs
 from kbuild.update import notify_if_update_available, perform_update
 
 

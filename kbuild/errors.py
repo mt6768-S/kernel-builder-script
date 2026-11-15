@@ -17,13 +17,6 @@ class KbuildError(Exception):
         return self.message
 
 
-class ConfigError(KbuildError):
-    """Raised when configuration validation, reading, or writing fails."""
-
-    def __init__(self, message: str, exit_code: int = 2):
-        super().__init__(message, exit_code=exit_code)
-
-
 class PreflightError(KbuildError):
     """Raised when environment or tool requirements are not met."""
 

@@ -11,7 +11,6 @@ import shutil
 from rich.table import Table
 
 from kbuild import __version__, console
-from kbuild.config import load_config
 from kbuild.doctor import test_binary_execution
 from kbuild.paths import (
     KBUILD_AK3_DIR,
@@ -20,6 +19,7 @@ from kbuild.paths import (
     KBUILD_TOOLCHAIN_INFO_FILE,
     get_symlink_path,
 )
+from kbuild.settings import load_config
 
 
 def show_info() -> None:

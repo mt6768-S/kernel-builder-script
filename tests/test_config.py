@@ -1,13 +1,16 @@
-import pytest
-
-from kbuild.config import (
+from kbuild.settings import (
     KbuildConfig,
     load_config,
-    parse_bool,
     save_config,
     update_config_from_pairs,
 )
-from kbuild.errors import ConfigError
+
+
+def _patch_config_file(tmp_path, monkeypatch):
+    custom_root = tmp_path / ".kbuild"
+    monkeypatch.setattr("kbuild.paths.KBUILD_ROOT", custom_root)
+    monkeypatch.setattr("kbuild.paths.KBUILD_CONFIG_FILE", custom_root / "config.json")
+    return custom_root / "config.json"
 
 
 def test_default_config():
@@ -21,29 +24,30 @@ def test_default_config():
     assert cfg.nomount_target == "dev"
     assert cfg.zip_prefix == "Skyron"
     assert cfg.default_defconfig == "vendor/mt6768_defconfig"
+    assert cfg.jobs is None
 
 
-def test_parse_bool():
-    for val in ("true", "1", "yes", "on", "enable", "enabled", True):
-        assert parse_bool(val) is True
-    for val in ("false", "0", "no", "off", "disable", "disabled", False):
-        assert parse_bool(val) is False
-    with pytest.raises(ConfigError):
-        parse_bool("invalid")
+def test_boolean_coercion(tmp_path, monkeypatch):
+    _patch_config_file(tmp_path, monkeypatch)
+
+    updated = update_config_from_pairs(["telegram=no", "gofile=enable"])
+    assert updated.telegram is False
+    assert updated.gofile is True
+
+    unchanged = update_config_from_pairs(["telegram=invalid"])
+    assert unchanged.telegram is False
 
 
 def test_save_and_load_config(tmp_path, monkeypatch):
-    custom_root = tmp_path / ".kbuild"
-    monkeypatch.setattr("kbuild.paths.KBUILD_ROOT", custom_root)
-    monkeypatch.setattr("kbuild.paths.KBUILD_CONFIG_FILE", custom_root / "config.json")
-    monkeypatch.setattr("kbuild.config.KBUILD_CONFIG_FILE", custom_root / "config.json")
+    cfg_file = _patch_config_file(tmp_path, monkeypatch)
 
-    cfg = KbuildConfig(zip_prefix="CustomPrefix", telegram=False, jobs=8)
+    cfg = KbuildConfig()
+    cfg.zip_prefix = "CustomPrefix"
+    cfg.telegram = False
+    cfg.jobs = 8
     save_config(cfg)
 
-    cfg_file = custom_root / "config.json"
     assert cfg_file.is_file()
-    # Check permissions 0600
     mode = cfg_file.stat().st_mode & 0o777
     assert mode == 0o600
 
@@ -54,10 +58,7 @@ def test_save_and_load_config(tmp_path, monkeypatch):
 
 
 def test_update_config_from_pairs(tmp_path, monkeypatch):
-    custom_root = tmp_path / ".kbuild"
-    monkeypatch.setattr("kbuild.paths.KBUILD_ROOT", custom_root)
-    monkeypatch.setattr("kbuild.paths.KBUILD_CONFIG_FILE", custom_root / "config.json")
-    monkeypatch.setattr("kbuild.config.KBUILD_CONFIG_FILE", custom_root / "config.json")
+    _patch_config_file(tmp_path, monkeypatch)
 
     updated = update_config_from_pairs(
         ["telegram=false", "ksu=true", "ksu_target=v3.0", "jobs=12"]

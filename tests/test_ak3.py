@@ -2,7 +2,7 @@ import pathlib
 import zipfile
 
 from kbuild.ak3 import AnyKernelManager
-from kbuild.config import KbuildConfig
+from kbuild.settings import KbuildConfig
 
 
 def test_ak3_package(tmp_path, monkeypatch):

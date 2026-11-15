@@ -17,9 +17,9 @@ from collections.abc import Sequence
 
 from loguru import logger
 
-from kbuild.config import KbuildConfig
 from kbuild.errors import PackagingError
 from kbuild.paths import KBUILD_AK3_DIR, ensure_kbuild_dirs
+from kbuild.settings import KbuildConfig
 
 
 class AnyKernelManager:

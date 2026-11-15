@@ -24,12 +24,12 @@ from loguru import logger
 
 from kbuild import console
 from kbuild.ak3 import AnyKernelManager
-from kbuild.config import KbuildConfig, load_config
 from kbuild.dtbo import generate_dtbo_image
 from kbuild.errors import BuildError, PreflightError
 from kbuild.ksu import KernelSUManager, extract_ksu_owner
 from kbuild.log_parser import extract_build_errors
 from kbuild.nomount import NoMountManager
+from kbuild.settings import KbuildConfig, load_config
 from kbuild.toolchain import ToolchainManager
 from kbuild.upload.gofile import GoFileUploader
 from kbuild.upload.telegram import TelegramUploader
