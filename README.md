@@ -9,6 +9,7 @@ Fast, modular Android kernel build and packaging CLI written in Python.
 ## Features
 
 - **Automated Toolchain Management**: Automatically fetches, verifies, and updates the latest [Neutron Clang](https://github.com/Neutron-Toolchains/clang-build-catalogue) release or falls back to system Clang.
+- **Smart Defconfig Resolution**: Auto-expands device names into base defconfig and device configs (e.g., `kb . selene` auto-applies `vendor/mt6768_defconfig` and `vendor/selene.config`).
 - **KernelSU & NoMount Injections**: One-flag injection of KernelSU and NoMount directly into kernel source trees, with post-injection `olddefconfig` synchronization and clean teardown.
 - **AnyKernel3 Packaging**: Automatically packages compiled `Image` / `Image.gz-dtb` and generated `dtbo.img` into a flashable AnyKernel3 zip.
 - **Smart Telegram Notifications**:
@@ -31,6 +32,12 @@ Fast, modular Android kernel build and packaging CLI written in Python.
 
 ## Installation
 
+### One-Line Install (Recommended)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/mt6768-S/kernel-builder-script/main/scripts/install.sh | bash
+```
+
 ### From Source
 
 ```bash
@@ -41,9 +48,10 @@ cd kernel-builder-script
 pip install -e .
 ```
 
-Or run the installer script:
+Or run the local installer:
 ```bash
-python main.py
+./scripts/install.sh
+# or: python main.py
 ```
 
 This creates a dedicated virtual environment in `~/.kbuild/venv` and symlinks `kb` to `~/.local/bin/kb`.
@@ -52,27 +60,34 @@ This creates a dedicated virtual environment in `~/.kbuild/venv` and symlinks `k
 
 ## CLI Usage
 
-Run `kb` from within any kernel source tree:
+Run `kb` by specifying the kernel path (use `.` for the current directory) and the target device or defconfig:
 
 ```bash
-# Basic build with defconfig
-kb defconfig=vendor/mt6768_defconfig
+# Build target device (auto-applies vendor/mt6768_defconfig + vendor/selene.config)
+kb . selene
 
-# Build with KernelSU and custom AnyKernel3 zip prefix
-kb defconfig=vendor/mt6768_defconfig --ksu --prefix=Skyron
+# If you are already inside the kernel source directory:
+kb selene
 
-# Clean build with NoMount and explicit parallel jobs
-kb defconfig=vendor/mt6768_defconfig --clean --nomount -j16
+# Clean build with KernelSU and custom zip prefix
+kb . selene --clean --ksu --prefix=Skyron
+
+# Multi-threaded build with NoMount
+kb . selene --nomount -j16
+
+# Build with explicit defconfig paths
+kb . vendor/mt6768_defconfig vendor/selene.config
 
 # Build without Telegram or GoFile uploads
-kb defconfig=vendor/mt6768_defconfig --no-telegram --no-gofile
+kb . selene --no-telegram --no-gofile
 ```
 
 ### CLI Options
 
-| Flag | Description |
+| Argument / Flag | Description |
 | :--- | :--- |
-| `defconfig=<name>` | Kernel defconfig file to build |
+| `[kernel_path]` | Path to kernel source tree (e.g. `.` for current directory) |
+| `<device / defconfig...>` | Target device (e.g. `selene`) or defconfig make targets |
 | `-j, --jobs <N>` | Number of parallel build threads (default: CPU core count) |
 | `--clean, --no-clean` | Clean build directory before compilation (`make mrproper`) |
 | `--ksu, --no-ksu` | Enable/disable KernelSU injection |
@@ -84,6 +99,7 @@ kb defconfig=vendor/mt6768_defconfig --no-telegram --no-gofile
 | `--prefix <prefix>` | AnyKernel3 zip filename prefix (default: `Skyron`) |
 | `--clang <path>` | Path to custom Clang toolchain |
 | `--ak3 <path>` | Path to custom AnyKernel3 template directory |
+| `--cleanup` | Clean up KernelSU and NoMount modifications without building |
 
 ---
 

@@ -24,3 +24,38 @@ def test_resolve_defconfigs(tmp_path):
 
     res_direct = resolve_defconfigs(tmp_path, ["vendor/mt6768_defconfig"])
     assert res_direct == ["vendor/mt6768_defconfig"]
+
+
+def test_builder_positional_path_and_device(tmp_path, monkeypatch):
+    import argparse
+
+    from kbuild.builder import KernelBuilder
+
+    (tmp_path / "Makefile").write_text(
+        "VERSION = 6\nPATCHLEVEL = 6\n", encoding="utf-8"
+    )
+    configs_dir = tmp_path / "arch" / "arm64" / "configs" / "vendor"
+    configs_dir.mkdir(parents=True)
+    (configs_dir / "mt6768_defconfig").write_text("", encoding="utf-8")
+    (configs_dir / "selene.config").write_text("", encoding="utf-8")
+
+    parsed_flags = argparse.Namespace(
+        clean=None,
+        ksu=None,
+        ksu_target=None,
+        nomount=None,
+        nomount_target=None,
+        telegram=False,
+        gofile=False,
+        jobs=4,
+        cc=None,
+        prefix=None,
+        ak3=None,
+        clang=None,
+        cleanup=False,
+    )
+
+    builder = KernelBuilder(parsed_flags, [str(tmp_path), "selene"])
+    assert builder.source_dir == tmp_path
+    assert builder.defconfigs == ["vendor/mt6768_defconfig", "vendor/selene.config"]
+    assert builder.device == "selene"
