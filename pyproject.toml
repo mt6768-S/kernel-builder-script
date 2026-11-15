@@ -13,6 +13,7 @@ dependencies = [
     "requests>=2.31.0",
     "rich>=13.7.0",
     "packaging>=23.0",
+    "loguru>=0.7.0",
 ]
 
 [project.optional-dependencies]

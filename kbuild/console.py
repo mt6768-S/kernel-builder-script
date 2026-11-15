@@ -1,5 +1,8 @@
 """
 Rich console logging and formatting for kbuild with bootstrap fallback.
+
+Log records are routed through `loguru` when it is installed; otherwise the
+helpers below fall back to direct printing.
 """
 
 from __future__ import annotations
@@ -64,12 +67,52 @@ except ImportError:
     console = _DummyConsole()  # type: ignore
     err_console = _DummyConsole()  # type: ignore
 
+try:
+    from loguru import logger
+
+    _loguru = True
+except ImportError:
+    _loguru = False
+
+
+_PREFIXES = {
+    "INFO": "[bold cyan][*][/bold cyan]",
+    "SUCCESS": "[bold green][✓][/bold green]",
+    "WARNING": "[bold yellow][!][/bold yellow]",
+    "ERROR": "[bold red][✗][/bold red]",
+}
+_PLAIN_PREFIXES = {
+    "INFO": "[*]",
+    "SUCCESS": "[✓]",
+    "WARNING": "[!]",
+    "ERROR": "[✗]",
+}
+
+
+def _render(level: str, msg: str) -> None:
+    if _rich:
+        target = err_console if level == "ERROR" else console
+        target.print(f"{_PREFIXES.get(level, _PREFIXES['INFO'])} {msg}")
+    else:
+        prefix = _PLAIN_PREFIXES.get(level, _PLAIN_PREFIXES["INFO"])
+        stream = sys.stderr if level == "ERROR" else sys.stdout
+        print(f"{prefix} {msg}", file=stream, flush=True)
+
+
+if _loguru:
+    logger.remove()
+
+    def _sink(message: Any) -> None:
+        _render(message.record["level"].name, message.record["message"])
+
+    logger.add(_sink, level="INFO")
+
 
 def log_info(msg: str) -> None:
-    if _rich:
-        console.print(f"[bold cyan][*][/bold cyan] {msg}")
+    if _loguru:
+        logger.info("{}", msg)
     else:
-        print(f"[*] {msg}", flush=True)
+        _render("INFO", msg)
 
 
 def log_step(step: str, title: str) -> None:
@@ -81,24 +124,24 @@ def log_step(step: str, title: str) -> None:
 
 
 def log_success(msg: str) -> None:
-    if _rich:
-        console.print(f"[bold green][✓][/bold green] {msg}")
+    if _loguru:
+        logger.success("{}", msg)
     else:
-        print(f"[✓] {msg}", flush=True)
+        _render("SUCCESS", msg)
 
 
 def log_warn(msg: str) -> None:
-    if _rich:
-        console.print(f"[bold yellow][!][/bold yellow] {msg}")
+    if _loguru:
+        logger.warning("{}", msg)
     else:
-        print(f"[!] {msg}", flush=True)
+        _render("WARNING", msg)
 
 
 def log_error(msg: str) -> None:
-    if _rich:
-        err_console.print(f"[bold red][✗][/bold red] {msg}")
+    if _loguru:
+        logger.error("{}", msg)
     else:
-        print(f"[✗] {msg}", file=sys.stderr, flush=True)
+        _render("ERROR", msg)
 
 
 def print_table(
