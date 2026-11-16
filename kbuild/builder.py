@@ -512,7 +512,6 @@ class KernelBuilder:
             "LLVM=1",
             "LLVM_IAS=1",
             "LD=ld.lld",
-            "AS=llvm-as",
             "AR=llvm-ar",
             "NM=llvm-nm",
             "OBJCOPY=llvm-objcopy",
