@@ -305,9 +305,20 @@ export PATH="{clang_dir / "bin"}:$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
 
         neutron_bin = KBUILD_CLANG_DIR / "bin" / "clang"
         if neutron_bin.is_file():
-            is_ok, _ = cls.test_clang_binary(neutron_bin)
+            is_ok, reason = cls.test_clang_binary(neutron_bin)
             if is_ok:
                 return KBUILD_CLANG_DIR
+            logger.warning("{}", f"Neutron Clang is unavailable: {reason}")
+            if any(
+                marker in reason
+                for marker in ("CPU", "Illegal instruction", "SIGILL", "missing AVX")
+            ):
+                system_clang = cls.find_system_clang()
+                if system_clang:
+                    logger.warning(
+                        "{}", f"Using host Clang instead: {system_clang}"
+                    )
+                    return system_clang.parent.parent
 
         # Attempt to install or update Neutron Clang
         try:
