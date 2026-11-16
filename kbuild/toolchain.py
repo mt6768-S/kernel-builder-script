@@ -49,6 +49,29 @@ class ToolchainManager:
                 timeout=5,
             )
             if res.returncode == 0 and res.stdout:
+                assembler = subprocess.run(
+                    [
+                        str(clang_bin),
+                        "--target=aarch64-linux-gnu",
+                        "-fintegrated-as",
+                        "-c",
+                        "-x",
+                        "assembler",
+                        "/dev/null",
+                        "-o",
+                        os.devnull,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if assembler.returncode in (-4, 132):
+                    return (
+                        False,
+                        "Incompatible with host CPU (assembler probe hit SIGILL / missing AVX support)",
+                    )
+                if assembler.returncode != 0:
+                    return False, "AArch64 integrated assembler is not supported"
                 return True, res.stdout.splitlines()[0].strip()
             elif res.returncode in (-4, 132):
                 return (

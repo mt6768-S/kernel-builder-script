@@ -351,8 +351,13 @@ class KernelBuilder:
         clang_bin = (
             clang_dir / "bin" / "clang"
             if (clang_dir / "bin" / "clang").is_file()
-            else pathlib.Path(shutil.which(self.cc) or self.cc)
+            else ToolchainManager.find_system_clang()
         )
+        if not clang_bin:
+            raise PreflightError("Resolved Clang toolchain has no usable compiler binary.")
+        # Keep the compiler selection independent from PATH, which is prefixed
+        # with the Neutron directory even when the system fallback was chosen.
+        self.cc = str(clang_bin)
         _, self.compiler_ver = ToolchainManager.test_clang_binary(clang_bin)
 
         start_time = time.time()
