@@ -344,7 +344,6 @@ class KernelBuilder:
             logger.success("{}", "Integrations cleaned up successfully.")
             return 0
 
-        # Resolve toolchain
         clang_dir = ToolchainManager.resolve_toolchain(self.flags.clang)
         if not clang_dir:
             raise PreflightError("Failed to resolve Clang toolchain.")
@@ -352,7 +351,7 @@ class KernelBuilder:
         clang_bin = (
             clang_dir / "bin" / "clang"
             if (clang_dir / "bin" / "clang").is_file()
-            else pathlib.Path(shutil.which("clang") or "clang")
+            else pathlib.Path(shutil.which(self.cc) or self.cc)
         )
         _, self.compiler_ver = ToolchainManager.test_clang_binary(clang_bin)
 
