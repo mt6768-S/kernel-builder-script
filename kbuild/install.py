@@ -28,7 +28,6 @@ RC_MARKER_END = "# <<< kbuild initialize <<<"
 SHELL_RC_BLOCK = f"""{RC_MARKER_START}
 # !! Contents within this block are managed by 'kb' !!
 export PATH="$HOME/.local/bin:$HOME/.kbuild/bin:$PATH"
-[ -f "$HOME/.kbuild/bin/env.sh" ] && source "$HOME/.kbuild/bin/env.sh"
 {RC_MARKER_END}
 """
 
