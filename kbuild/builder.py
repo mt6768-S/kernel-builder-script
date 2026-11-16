@@ -500,19 +500,26 @@ class KernelBuilder:
         env["KBUILD_BUILD_USER"] = self.config.user or getpass.getuser()
         env["KBUILD_BUILD_HOST"] = self.config.host or socket.gethostname()
 
+        # Keep Neutron for the target, but compile host tools with a compiler
+        # that is known to execute on this machine (fixdep exits with SIGILL
+        # when built or run through an incompatible downloaded toolchain).
+        host_clang = ToolchainManager.find_system_clang()
         base_make_args = [
             "make",
             f"O={out_dir}",
             "ARCH=arm64",
             f"CC={self.cc}",
-            "LLVM=1",
-            "LLVM_IAS=1",
             "LD=ld.lld",
             "CROSS_COMPILE=aarch64-linux-gnu-",
             "CROSS_COMPILE_ARM32=arm-linux-gnueabi-",
             "CLANG_TRIPLE=aarch64-linux-gnu-",
             f"-j{self.jobs}",
         ]
+        if host_clang:
+            base_make_args.append(f"HOSTCC={host_clang}")
+            host_clangxx = shutil.which("clang++")
+            if host_clangxx:
+                base_make_args.append(f"HOSTCXX={host_clangxx}")
 
         if self.clean:
             logger.info("{}", f"Cleaning build directory: {out_dir}")

@@ -60,6 +60,29 @@ class ToolchainManager:
             return False, str(e)
 
     @classmethod
+    def find_system_clang(cls) -> pathlib.Path | None:
+        """Find a CPU-compatible Clang for building host-side kernel tools."""
+        candidates: list[pathlib.Path] = []
+        for name in ("clang", "clang-23", "clang-22", "clang-21", "clang-20"):
+            binary = shutil.which(name)
+            if binary:
+                candidates.append(pathlib.Path(binary).resolve())
+
+        for directory in (pathlib.Path("/usr/bin"), pathlib.Path("/usr/local/bin")):
+            candidates.extend(
+                sorted(
+                    path
+                    for path in directory.glob("clang-[0-9]*")
+                    if path.is_file() and os.access(path, os.X_OK)
+                )
+            )
+
+        for candidate in candidates:
+            if cls.test_clang_binary(candidate)[0]:
+                return candidate
+        return None
+
+    @classmethod
     def get_latest_release_info(cls) -> dict[str, Any]:
         logger.info("{}", "Checking latest Neutron Clang release on GitHub...")
         tag_name: str | None = None
