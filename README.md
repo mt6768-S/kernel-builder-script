@@ -12,6 +12,7 @@ Fast, modular Android kernel build and packaging CLI written in Python.
 - **Smart Defconfig Resolution**: Auto-expands device names into base defconfig and device configs (e.g., `kb . selene` auto-applies `vendor/mt6768_defconfig` and `vendor/selene.config`).
 - **KernelSU & NoMount Injections**: One-flag injection of KernelSU and NoMount directly into kernel source trees, with post-injection `olddefconfig` synchronization and clean teardown.
 - **AnyKernel3 Packaging**: Automatically packages compiled `Image` / `Image.gz-dtb` and generated `dtbo.img` into a flashable AnyKernel3 zip.
+- **Standalone Bash Builder**: `scripts/build.sh` provides a standalone bash build and packaging path for the selene workflow.
 - **Smart Telegram Notifications**:
   - Real-time build status updates powered by `python-telegram-bot`.
   - Targeted compiler and linker error extraction on build failure with the full `.log` file attached.
@@ -132,6 +133,63 @@ kb uninstall
 # Display version
 kb version
 ```
+
+---
+
+## Standalone Bash Builder
+
+`scripts/build.sh` is a self-contained bash alternative to `kb` for the Redmi 10 Prime (`selene`) / MT6768 workflow. It needs no third-party Python packages (`python3` is only used as a zip fallback and for archive validation), which makes it convenient for minimal hosts and CI images.
+
+It expects a workspace laid out like this:
+
+```text
+workspace/
+├── source/                   # kernel source tree
+├── toolchains/neutron-clang  # Neutron Clang + LLVM binutils
+└── Zyte-Kernel/              # AnyKernel3 template
+```
+
+Point it at a different template or toolchain with `AK3_DIR` / `CLANG_DIR`.
+
+### Usage
+
+Run from the workspace root, or set `KBUILD_WORKSPACE`:
+
+```bash
+cd ~/kernel-workspace
+
+/path/to/kernel-builder-script/scripts/build.sh           # incremental + zip
+/path/to/kernel-builder-script/scripts/build.sh -r -m     # regenerate config, menuconfig
+/path/to/kernel-builder-script/scripts/build.sh -c -j8    # clean rebuild, 8 jobs
+/path/to/kernel-builder-script/scripts/build.sh --no-zip  # image only
+```
+
+| Option | Description |
+| :--- | :--- |
+| `-j, --jobs <N>` | Parallel jobs (default: `nproc`) |
+| `-c, --clean` | Remove `out/` and rebuild from scratch |
+| `-r, --reconfig` | Rebuild `.config` from `vendor/mt6768_defconfig` + `vendor/selene.config` |
+| `-m, --menuconfig` | Open `menuconfig` before building |
+| `--no-zip` | Skip AnyKernel3 packaging |
+| `-v, --verbose` | Stream raw `make` output |
+| `-h, --help` | Show usage |
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `KBUILD_WORKSPACE` | current directory | Workspace root containing `source/` |
+| `AK3_DIR` | `<workspace>/Zyte-Kernel` | AnyKernel3 template directory |
+| `CLANG_DIR` | `<workspace>/toolchains/neutron-clang` | Clang/LLVM toolchain |
+| `ZIP_PREFIX` | `Zyte-Kernel` | AnyKernel3 zip filename prefix |
+
+### Incremental build notes
+
+The script avoids three common sources of full rebuilds:
+
+- `KBUILD_BUILD_VERSION` is pinned, so `link-vmlinux.sh` cannot bump `.version` and force a relink on every build.
+- MediaTek's eccci Makefile refers to a quoted `"mt6768"` path that never exists on disk; a symlink satisfies the prerequisite so `drivers/` and `vmlinux.o` are not rebuilt every time.
+- Host OpenSSL builds without the `ENGINE` API get the `-DOPENSSL_IS_BORINGSSL` define for `extract-cert`.
+
+The AnyKernel3 step stages the template, copies `Image.gz-dtb` and `mt6768.dtb` (as `dtb`), then verifies required files and executable modes before reporting success.
 
 ---
 
